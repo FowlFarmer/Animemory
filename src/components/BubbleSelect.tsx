@@ -1,5 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useId, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 
 export type BubbleSelectOption<T extends string | number> = {
@@ -40,12 +39,8 @@ export function BubbleSelect<T extends string | number>({
   className
 }: BubbleSelectProps<T>) {
   const [open, setOpen] = useState(false);
-  const [menuRect, setMenuRect] = useState<{ top: number; left: number; width: number } | null>(
-    null
-  );
   const instanceId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLUListElement>(null);
   const listId = useId();
   const selected = options.find((option) => option.value === value);
@@ -63,53 +58,32 @@ export function BubbleSelect<T extends string | number>({
     };
   }, [instanceId]);
 
-  useLayoutEffect(() => {
-    if (!open || !triggerRef.current) {
-      setMenuRect(null);
-      return;
-    }
-
-    function updateMenuRect() {
-      const rect = triggerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      setMenuRect({
-        top: rect.bottom + 6,
-        left: rect.left,
-        width: rect.width
-      });
-    }
-
-    updateMenuRect();
-    window.addEventListener("resize", updateMenuRect);
-    window.addEventListener("scroll", updateMenuRect, true);
-    return () => {
-      window.removeEventListener("resize", updateMenuRect);
-      window.removeEventListener("scroll", updateMenuRect, true);
-    };
-  }, [open]);
-
   useEffect(() => {
     if (!open) return;
 
     function onPointerDown(event: MouseEvent) {
       const target = event.target as Node;
       if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
-      setOpen(false);
-      setGlobalOpenId(null);
+      close();
     }
 
     function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-        setGlobalOpenId(null);
-      }
+      if (event.key === "Escape") close();
+    }
+
+    function onScroll(event: Event) {
+      const target = event.target;
+      if (target instanceof Node && menuRef.current?.contains(target)) return;
+      close();
     }
 
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onPointerDown);
       document.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open]);
 
@@ -132,51 +106,6 @@ export function BubbleSelect<T extends string | number>({
     close();
   }
 
-  const menu =
-    open && menuRect ? (
-      <ul
-        className={`bubble-select-menu is-portal ${tone}`}
-        id={listId}
-        ref={menuRef}
-        role="listbox"
-        style={{
-          position: "fixed",
-          top: menuRect.top,
-          left: menuRect.left,
-          width: menuRect.width,
-          zIndex: 10000
-        }}
-      >
-        {allowEmpty ? (
-          <li role="presentation">
-            <button
-              className={value === undefined ? "bubble-select-option is-selected" : "bubble-select-option"}
-              onClick={() => pick(undefined)}
-              role="option"
-              aria-selected={value === undefined}
-              type="button"
-            >
-              {emptyLabel}
-            </button>
-          </li>
-        ) : null}
-        {options.map((option) => (
-          <li key={String(option.value)} role="presentation">
-            <button
-              className={option.value === value ? "bubble-select-option is-selected" : "bubble-select-option"}
-              onClick={() => pick(option.value)}
-              role="option"
-              aria-selected={option.value === value}
-              type="button"
-            >
-              <span>{option.label}</span>
-              {option.hint ? <span className="bubble-select-hint">{option.hint}</span> : null}
-            </button>
-          </li>
-        ))}
-      </ul>
-    ) : null;
-
   return (
     <div
       className={`bubble-select ${tone}${open ? " is-open" : ""}${className ? ` ${className}` : ""}`}
@@ -189,7 +118,6 @@ export function BubbleSelect<T extends string | number>({
         aria-label={ariaLabel}
         className="bubble-select-trigger"
         onClick={toggleOpen}
-        ref={triggerRef}
         type="button"
       >
         <span className={selected || (allowEmpty && value === undefined) ? "bubble-select-value" : "bubble-select-placeholder"}>
@@ -197,7 +125,38 @@ export function BubbleSelect<T extends string | number>({
         </span>
         <ChevronDown aria-hidden="true" className={open ? "bubble-select-chevron is-open" : "bubble-select-chevron"} size={16} />
       </button>
-      {menu ? createPortal(menu, document.body) : null}
+
+      {open ? (
+        <ul className={`bubble-select-menu ${tone}`} id={listId} ref={menuRef} role="listbox">
+          {allowEmpty ? (
+            <li role="presentation">
+              <button
+                className={value === undefined ? "bubble-select-option is-selected" : "bubble-select-option"}
+                onClick={() => pick(undefined)}
+                role="option"
+                aria-selected={value === undefined}
+                type="button"
+              >
+                {emptyLabel}
+              </button>
+            </li>
+          ) : null}
+          {options.map((option) => (
+            <li key={String(option.value)} role="presentation">
+              <button
+                className={option.value === value ? "bubble-select-option is-selected" : "bubble-select-option"}
+                onClick={() => pick(option.value)}
+                role="option"
+                aria-selected={option.value === value}
+                type="button"
+              >
+                <span>{option.label}</span>
+                {option.hint ? <span className="bubble-select-hint">{option.hint}</span> : null}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

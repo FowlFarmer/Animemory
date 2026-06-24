@@ -1,5 +1,6 @@
 import { readJson } from "../lib/http.js";
 import type { AnimeCandidate, Provider, SaveSelection } from "../types.js";
+import { titleVariant, uniqueTitleVariants } from "../lib/titles.js";
 import { toAniListStatus } from "./status.js";
 
 type AniListGraphqlResponse<T> = {
@@ -45,22 +46,33 @@ export const anilistProvider: Provider = {
       token
     );
 
-    return data.Page.media.map((media) => ({
-      providerId: media.id,
-      anilistId: media.id,
-      malId: media.idMal ?? null,
-      title: media.title.userPreferred ?? media.title.romaji ?? media.title.english ?? "Untitled",
-      synonyms: [
-        media.title.romaji,
-        media.title.english,
-        media.title.native,
-        ...(media.synonyms ?? [])
-      ].filter(Boolean) as string[],
-      year: media.startDate?.year ?? null,
-      episodes: media.episodes ?? null,
-      image: media.coverImage?.large ?? null,
-      siteUrl: media.siteUrl ?? null
-    }));
+    return data.Page.media.map((media) => {
+      const displayTitle =
+        media.title.userPreferred ?? media.title.romaji ?? media.title.english ?? "Untitled";
+      const titleVariants = uniqueTitleVariants([
+        titleVariant(displayTitle, "primary"),
+        titleVariant(media.title.romaji, "romaji"),
+        titleVariant(media.title.english, "english"),
+        titleVariant(media.title.native, "native"),
+        ...(media.synonyms ?? []).map((synonym) => titleVariant(synonym, "synonym"))
+      ]);
+      const synonyms = titleVariants
+        .filter((variant) => variant.language !== "primary")
+        .map((variant) => variant.title);
+
+      return {
+        providerId: media.id,
+        anilistId: media.id,
+        malId: media.idMal ?? null,
+        title: displayTitle,
+        synonyms,
+        titleVariants,
+        year: media.startDate?.year ?? null,
+        episodes: media.episodes ?? null,
+        image: media.coverImage?.large ?? null,
+        siteUrl: media.siteUrl ?? null
+      } satisfies AnimeCandidate;
+    });
   },
   async saveAnimeEntry(selection: SaveSelection, token: string): Promise<unknown> {
     return anilistRequest(

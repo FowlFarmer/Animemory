@@ -46,27 +46,37 @@ button:focus-visible, a:focus-visible, textarea:focus-visible, .bubble-select-tr
 .corner-links {
   bottom: 14px;
   display: flex;
-  justify-content: space-between;
+  gap: 8px;
+  justify-content: flex-start;
   left: clamp(18px, 4vw, 64px);
   pointer-events: none;
   position: fixed;
-  right: clamp(18px, 4vw, 64px);
   z-index: 5;
 }
 
 .corner-link {
+  align-items: center;
   background: var(--paper);
   border: 2px solid #ded9e4;
   border-radius: 12px 10px 13px 9px / 10px 13px 9px 12px;
   box-shadow: 2px 3px 0 rgba(119, 103, 184, .1);
   color: var(--muted);
+  display: inline-flex;
   font-family: "Patrick Hand", cursive;
   font-size: 1rem;
+  gap: 6px;
   line-height: 1;
   padding: 6px 11px;
   pointer-events: auto;
   text-decoration: none;
   transition: transform 150ms ease, box-shadow 150ms ease, color 150ms ease;
+}
+
+.corner-link-icon {
+  display: block;
+  flex-shrink: 0;
+  height: 18px;
+  width: 18px;
 }
 
 .corner-link:hover {
@@ -157,17 +167,18 @@ h2 { color: var(--ink); font-size: 1.5rem; letter-spacing: 0; line-height: 1; ma
 .entry-meta span { background: #f1eeff; border-radius: 999px; color: var(--lilac-deep); font-family: "Patrick Hand", cursive; font-size: .9rem; line-height: 1; padding: 3px 7px; }
 .entry-actions { align-content: start; display: grid; gap: 7px; }
 
-.bubble-select { position: relative; width: 100%; }
-.bubble-select.is-open { z-index: 2; }
+.bubble-select { isolation: isolate; position: relative; width: 100%; }
+.bubble-select.is-open { z-index: 50; }
 .match-card:has(.bubble-select.is-open) { position: relative; z-index: 40; }
+.match-list:has(.bubble-select.is-open) { overflow: visible; }
+.review-sheet:has(.bubble-select.is-open) { overflow: visible; }
 .bubble-select-trigger { align-items: center; background: #fbfaf4; border: 2px solid #dcdde4; border-radius: 11px 9px 12px 10px / 10px 12px 9px 11px; box-shadow: 2px 2px 0 rgba(119, 103, 184, .07); color: var(--ink); display: flex; font-size: .88rem; font-weight: 700; gap: 8px; justify-content: space-between; min-height: 36px; padding: 0 10px; text-align: left; transition: transform 120ms ease, box-shadow 120ms ease; width: 100%; }
 .bubble-select-trigger:hover { transform: translateY(-1px); }
 .bubble-select-value, .bubble-select-placeholder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bubble-select-placeholder { color: #8b97ad; font-weight: 600; }
 .bubble-select-chevron { color: #8390a7; flex-shrink: 0; transition: transform 150ms ease; }
 .bubble-select-chevron.is-open { transform: rotate(180deg); }
-.bubble-select-menu { background: #fffefb; border: 2px solid #ded9e4; border-radius: 14px 11px 15px 12px / 12px 15px 11px 14px; box-shadow: 4px 6px 0 rgba(119, 103, 184, .12); list-style: none; margin: 0; max-height: min(220px, calc(100vh - 24px)); overflow: auto; padding: 6px; }
-.bubble-select-menu.is-portal { z-index: 10000; }
+.bubble-select-menu { background: #fffefb; border: 2px solid #ded9e4; border-radius: 14px 11px 15px 12px / 12px 15px 11px 14px; box-shadow: 4px 6px 0 rgba(119, 103, 184, .12); left: 0; list-style: none; margin: 6px 0 0; max-height: min(220px, calc(100vh - 24px)); overflow: auto; overscroll-behavior: contain; padding: 6px; position: absolute; right: 0; top: calc(100% - 2px); z-index: 100; }
 .bubble-select-option { align-items: center; background: transparent; border: 0; border-radius: 10px 8px 11px 9px; color: var(--ink); display: flex; font-size: .88rem; font-weight: 700; gap: 8px; justify-content: space-between; min-height: 34px; padding: 0 10px; text-align: left; transition: background-color 120ms ease; width: 100%; }
 .bubble-select-option:hover { background: #f4efff; }
 .bubble-select-option.is-selected { background: #ebe4ff; color: var(--lilac-deep); }
@@ -208,7 +219,7 @@ h2 { color: var(--ink); font-size: 1.5rem; letter-spacing: 0; line-height: 1; ma
 
 @media (max-width: 620px) {
   .page-shell { padding: 14px 15px 52px; }
-  .corner-links { bottom: 10px; left: 15px; right: 15px; }
+  .corner-links { bottom: 10px; left: 15px; }
   .corner-link { font-size: .92rem; padding: 5px 9px; }
   .site-header { gap: 10px; }
   .wordmark { font-size: 1.35rem; }

@@ -1,5 +1,5 @@
-import type { AnimeCandidate, MatchResult, ParsedAnimeEntry, Provider } from "../types.js";
-import { normalizeTitle, similarity } from "../lib/text.js";
+import type { MatchResult, ParsedAnimeEntry, Provider } from "../types.js";
+import { rankCandidate } from "../lib/titles.js";
 
 export async function matchEntries(
   provider: Provider,
@@ -16,22 +16,19 @@ async function matchEntry(
 ): Promise<MatchResult> {
   const candidates = await provider.searchAnime(searchQuery(entry), token);
   const scored = candidates
-    .map((candidate) => ({
-      candidate,
-      score: scoreCandidate(entry, candidate)
-    }))
-    .sort((a, b) => b.score - a.score);
+    .map((candidate) => rankCandidate(entry.title, candidate, yearBonus(entry, candidate)))
+    .sort((a, b) => b.matchScore - a.matchScore);
 
   const top = scored[0];
-  const selected = top && top.score >= 0.54 ? top.candidate : undefined;
+  const selected = top && top.matchScore >= 0.54 ? top : undefined;
 
   return {
     entry,
     selected,
-    confidence: top?.score ?? 0,
-    candidates: scored.map((item) => item.candidate),
+    confidence: top?.matchScore ?? 0,
+    candidates: scored,
     reason: selected
-      ? `Matched "${entry.title}" to "${selected.title}".`
+      ? `Matched "${entry.title}" to "${selected.matchedTitle}" (${selected.matchedLabel}).`
       : `No confident match for "${entry.title}".`
   };
 }
@@ -40,22 +37,8 @@ function searchQuery(entry: ParsedAnimeEntry): string {
   return entry.title;
 }
 
-function scoreCandidate(entry: ParsedAnimeEntry, candidate: AnimeCandidate): number {
-  const titleScore = Math.max(
-    similarity(entry.title, candidate.title),
-    ...candidate.synonyms.map((synonym) => similarity(entry.title, synonym))
-  );
-
-  const exactTitle =
-    normalizeTitle(entry.title) === normalizeTitle(candidate.title) ||
-    candidate.synonyms.some(
-      (synonym) => normalizeTitle(entry.title) === normalizeTitle(synonym)
-    );
-
-  const yearBonus =
-    entry.year && candidate.year
-      ? Math.max(0, 0.14 - Math.abs(entry.year - candidate.year) * 0.04)
-      : 0;
-
-  return Math.min(1, titleScore + (exactTitle ? 0.18 : 0) + yearBonus);
+function yearBonus(entry: ParsedAnimeEntry, candidate: { year?: number | null }): number {
+  return entry.year && candidate.year
+    ? Math.max(0, 0.14 - Math.abs(entry.year - candidate.year) * 0.04)
+    : 0;
 }

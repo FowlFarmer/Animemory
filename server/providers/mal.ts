@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { readJson } from "../lib/http.js";
 import type { AnimeCandidate, Provider, SaveSelection } from "../types.js";
+import { titleVariant, uniqueTitleVariants } from "../lib/titles.js";
 import { toMalStatus } from "./status.js";
 
 type MalSearchResponse = {
@@ -34,21 +35,32 @@ export const malProvider: Provider = {
 
     const json = await readJson<MalSearchResponse>(await fetch(url, { headers }));
 
-    return json.data.map(({ node }) => ({
-      providerId: node.id,
-      malId: node.id,
-      anilistId: null,
-      title: node.title,
-      synonyms: [
-        ...(node.alternative_titles?.synonyms ?? []),
-        node.alternative_titles?.en,
-        node.alternative_titles?.ja
-      ].filter(Boolean) as string[],
-      year: node.start_date ? Number(node.start_date.slice(0, 4)) : null,
-      episodes: node.num_episodes ?? null,
-      image: node.main_picture?.large ?? node.main_picture?.medium ?? null,
-      siteUrl: `https://myanimelist.net/anime/${node.id}`
-    }));
+    return json.data.map(({ node }) => {
+      const titleVariants = uniqueTitleVariants([
+        titleVariant(node.title, "primary"),
+        titleVariant(node.alternative_titles?.en, "english"),
+        titleVariant(node.alternative_titles?.ja, "japanese"),
+        ...(node.alternative_titles?.synonyms ?? []).map((synonym) =>
+          titleVariant(synonym, "synonym")
+        )
+      ]);
+      const synonyms = titleVariants
+        .filter((variant) => variant.language !== "primary")
+        .map((variant) => variant.title);
+
+      return {
+        providerId: node.id,
+        malId: node.id,
+        anilistId: null,
+        title: node.title,
+        synonyms,
+        titleVariants,
+        year: node.start_date ? Number(node.start_date.slice(0, 4)) : null,
+        episodes: node.num_episodes ?? null,
+        image: node.main_picture?.large ?? node.main_picture?.medium ?? null,
+        siteUrl: `https://myanimelist.net/anime/${node.id}`
+      } satisfies AnimeCandidate;
+    });
   },
   async saveAnimeEntry(selection: SaveSelection, token: string): Promise<unknown> {
     const url = `https://api.myanimelist.net/v2/anime/${selection.providerAnimeId}/my_list_status`;

@@ -64,6 +64,11 @@ export function roughTitleFromLine(raw: string): string {
 }
 
 export function similarity(left: string, right: string): number {
+  const leftTrim = left.trim();
+  const rightTrim = right.trim();
+  if (leftTrim && leftTrim === rightTrim) return 1;
+  if (leftTrim.toLowerCase() === rightTrim.toLowerCase()) return 1;
+
   const a = new Set(normalizeTitle(left).split(" ").filter(Boolean));
   const b = new Set(normalizeTitle(right).split(" ").filter(Boolean));
   if (!a.size || !b.size) return 0;

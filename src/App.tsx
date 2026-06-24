@@ -17,11 +17,11 @@ import {
 } from "./api";
 import { BubbleSelect } from "./components/BubbleSelect";
 import type {
-  AnimeCandidate,
   AuthStatus,
   MatchResult,
   NormalizedStatus,
   ProviderId,
+  RankedCandidate,
   SaveSelection
 } from "./types";
 
@@ -329,10 +329,23 @@ export function App() {
           rel="noopener noreferrer"
           target="_blank"
         >
+          <KofiIcon />
           Ko-fi
         </a>
       </nav>
     </main>
+  );
+}
+
+function KofiIcon() {
+  return (
+    <img
+      alt=""
+      className="corner-link-icon"
+      height={18}
+      src="https://storage.ko-fi.com/cdn/cup-border.png"
+      width={18}
+    />
   );
 }
 
@@ -356,7 +369,7 @@ function MatchCard({
   score?: number;
   progress?: number;
   result?: string;
-  onSelect: (candidate?: AnimeCandidate) => void;
+  onSelect: (candidate?: RankedCandidate) => void;
   onStatus: (status: NormalizedStatus) => void;
   onScore: (score?: number) => void;
   onProgress: (progress?: number) => void;
@@ -365,6 +378,7 @@ function MatchCard({
   const selected = match.candidates.find((candidate) => candidate.providerId === selectedId);
   const showProgress = statusUsesProgress(activeStatus);
   const episodeTotal = selected?.episodes ?? undefined;
+  const matchPercent = selected?.matchScore ?? match.confidence;
 
   return (
     <article className="match-card">
@@ -383,15 +397,22 @@ function MatchCard({
           }
           options={match.candidates.map((candidate) => ({
             value: candidate.providerId,
-            label: candidate.title,
-            hint: candidate.year ? String(candidate.year) : undefined
+            label: candidate.matchedTitle,
+            hint: [
+              `${Math.round(candidate.matchScore * 100)}%`,
+              candidate.matchedLabel,
+              candidate.year ? String(candidate.year) : undefined
+            ]
+              .filter(Boolean)
+              .join(" · ")
           }))}
           placeholder="Pick a match"
           tone="lilac"
           value={selectedId}
         />
         <div className="entry-meta">
-          <span>{Math.round(match.confidence * 100)}% match</span>
+          <span>{Math.round(matchPercent * 100)}% match</span>
+          {selected ? <span>{selected.matchedLabel}</span> : null}
           {episodeTotal ? <span>{episodeTotal} eps total</span> : null}
         </div>
       </div>

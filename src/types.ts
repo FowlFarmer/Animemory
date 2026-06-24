@@ -19,23 +19,45 @@ export type ParsedAnimeEntry = {
   notes?: string;
 };
 
+export type TitleLanguage =
+  | "primary"
+  | "english"
+  | "japanese"
+  | "romaji"
+  | "native"
+  | "synonym";
+
+export type TitleVariant = {
+  title: string;
+  language: TitleLanguage;
+  label: string;
+};
+
 export type AnimeCandidate = {
   providerId: number;
   malId?: number | null;
   anilistId?: number | null;
   title: string;
   synonyms: string[];
+  titleVariants: TitleVariant[];
   year?: number | null;
   episodes?: number | null;
   image?: string | null;
   siteUrl?: string | null;
 };
 
+export type RankedCandidate = AnimeCandidate & {
+  matchScore: number;
+  matchedTitle: string;
+  matchedLanguage: TitleLanguage;
+  matchedLabel: string;
+};
+
 export type MatchResult = {
   entry: ParsedAnimeEntry;
-  selected?: AnimeCandidate;
+  selected?: RankedCandidate;
   confidence: number;
-  candidates: AnimeCandidate[];
+  candidates: RankedCandidate[];
   reason: string;
 };
 
