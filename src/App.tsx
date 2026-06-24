@@ -318,6 +318,20 @@ export function App() {
           </div>
         </section>
       </section>
+
+      <nav className="corner-links" aria-label="Site links">
+        <a className="corner-link corner-link-site" href="https://tzhu.dev" rel="noopener noreferrer" target="_blank">
+          tzhu.dev
+        </a>
+        <a
+          className="corner-link corner-link-kofi"
+          href="https://ko-fi.com/fowlfarmer"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Ko-fi
+        </a>
+      </nav>
     </main>
   );
 }
