@@ -35,8 +35,9 @@ export async function startOAuth(
     url.searchParams.set("response_type", "code");
     url.searchParams.set("client_id", required(config.mal.clientId, "MAL_CLIENT_ID"));
     url.searchParams.set("redirect_uri", config.mal.redirectUri);
-    url.searchParams.set("code_challenge", sha256Base64Url(verifier!));
-    url.searchParams.set("code_challenge_method", "S256");
+    // MAL only supports PKCE plain (challenge must equal verifier).
+    url.searchParams.set("code_challenge", verifier!);
+    url.searchParams.set("code_challenge_method", "plain");
     url.searchParams.set("state", oauth.state);
     res.redirect(url.toString());
     return;
@@ -164,10 +165,6 @@ async function refreshMalToken(refreshToken: string): Promise<TokenResponse> {
       body
     })
   );
-}
-
-function sha256Base64Url(value: string): string {
-  return crypto.createHash("sha256").update(value).digest("base64url");
 }
 
 function required(value: string | undefined, name: string): string {
