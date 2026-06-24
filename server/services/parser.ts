@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { config } from "../config.js";
+import { config, isGeminiParserEnabled } from "../config.js";
 import type { ParsedAnimeEntry } from "../types.js";
 import {
   inferProgress,
@@ -25,7 +25,11 @@ const parsedSchema = z.array(parsedEntrySchema);
 
 export type ParseParser = "gemini" | "fallback";
 
-export type ParseParserReason = "no_api_key" | "gemini_empty" | "gemini_error";
+export type ParseParserReason =
+  | "no_api_key"
+  | "gemini_disabled"
+  | "gemini_empty"
+  | "gemini_error";
 
 export type ParseAnimeListResult = {
   entries: ParsedAnimeEntry[];
@@ -37,7 +41,7 @@ export async function parseAnimeList(text: string): Promise<ParseAnimeListResult
   const trimmed = text.trim();
   if (!trimmed) return { entries: [], parser: "fallback" };
 
-  if (config.gemini.apiKey) {
+  if (isGeminiParserEnabled()) {
     try {
       const geminiParsed = await parseWithGemini(trimmed);
       if (geminiParsed.length) {
@@ -52,6 +56,8 @@ export async function parseAnimeList(text: string): Promise<ParseAnimeListResult
       console.log(`[parse] parser=fallback entries=${entries.length}`);
       return { entries, parser: "fallback", reason: "gemini_error" };
     }
+  } else if (config.gemini.disabled) {
+    console.log("[parse] parser=fallback reason=gemini_disabled");
   } else {
     console.log("[parse] parser=fallback reason=no_api_key");
   }
@@ -61,7 +67,11 @@ export async function parseAnimeList(text: string): Promise<ParseAnimeListResult
   return {
     entries,
     parser: "fallback",
-    reason: config.gemini.apiKey ? "gemini_empty" : "no_api_key"
+    reason: config.gemini.disabled
+      ? "gemini_disabled"
+      : config.gemini.apiKey
+        ? "gemini_empty"
+        : "no_api_key"
   };
 }
 
@@ -99,11 +109,13 @@ async function parseWithGemini(text: string): Promise<ParsedAnimeEntry[]> {
         "Input:",
         text
       ].join("\n\n"),
-      response_format: {
-        type: "text",
-        mime_type: "application/json",
-        schema: animeEntryJsonSchema
-      }
+      response_format: [
+        {
+          type: "text",
+          mime_type: "application/json",
+          schema: animeEntryJsonSchema
+        }
+      ]
     })
   });
 
@@ -111,8 +123,23 @@ async function parseWithGemini(text: string): Promise<ParsedAnimeEntry[]> {
     throw new Error(`Gemini parse failed: ${response.status}`);
   }
 
-  const json = (await response.json()) as { output_text?: string; outputText?: string; output?: unknown };
-  const rawText = json.output_text ?? json.outputText ?? collectOutputText(json.output);
+  const json = (await response.json()) as GeminiInteractionResponse;
+  if (json.status && json.status !== "completed") {
+    throw new Error(`Gemini interaction status=${json.status}`);
+  }
+
+  const rawText =
+    json.output_text ??
+    json.outputText ??
+    extractModelOutputText(json.steps) ??
+    extractModelOutputText(json.output);
+
+  if (!rawText.trim()) {
+    throw new Error(
+      `Gemini returned no text output (status=${json.status ?? "unknown"}, steps=${json.steps?.length ?? 0})`
+    );
+  }
+
   const parsed = parsedSchema.parse(JSON.parse(rawText));
 
   return parsed.map((entry, index) => ({
@@ -122,16 +149,32 @@ async function parseWithGemini(text: string): Promise<ParsedAnimeEntry[]> {
   }));
 }
 
-function collectOutputText(output: unknown): string {
-  if (!Array.isArray(output)) return "";
-  return output
-    .flatMap((item) =>
-      Array.isArray((item as { content?: unknown[] }).content)
-        ? ((item as { content: Array<{ text?: string }> }).content ?? []).map(
-            (content) => content.text ?? ""
-          )
-        : []
-    )
+type GeminiInteractionStep = {
+  type?: string;
+  content?: Array<{ type?: string; text?: string }>;
+};
+
+type GeminiInteractionResponse = {
+  status?: string;
+  output_text?: string;
+  outputText?: string;
+  output?: GeminiInteractionStep[];
+  steps?: GeminiInteractionStep[];
+};
+
+function extractModelOutputText(steps: unknown): string {
+  if (!Array.isArray(steps)) return "";
+
+  const modelSteps = steps.filter(
+    (step): step is GeminiInteractionStep =>
+      typeof step === "object" && step !== null && (step as GeminiInteractionStep).type === "model_output"
+  );
+  const lastStep = modelSteps.at(-1);
+  if (!lastStep?.content) return "";
+
+  return lastStep.content
+    .filter((block) => block.type === "text" && block.text)
+    .map((block) => block.text!)
     .join("");
 }
 

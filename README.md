@@ -11,7 +11,7 @@ Animemory is a web app for turning a stray text list of anime into reviewed, bul
 - Lets the user review and override every match before anything is written.
 - Adds selected entries to the connected user's list.
 
-The parser uses Gemini 3.1 Flash Lite when `GEMINI_API_KEY` is configured. Without it, the app falls back to deterministic line parsing. In both modes, the app still searches the provider catalog and asks the user to review matches before writing anything.
+The parser can use Gemini 3.1 Flash Lite when enabled, but **Gemini is disabled by default** (`GEMINI_DISABLED=true`) while the deterministic fallback parser is being tested. Set `GEMINI_DISABLED=false` and provide `GEMINI_API_KEY` to turn Gemini parsing back on. In both modes, the app still searches the provider catalog and asks the user to review matches before writing anything.
 
 ## Stack
 
@@ -80,6 +80,7 @@ AniList:     http://127.0.0.1:8787/api/auth/anilist/callback
 Fill in `.env`:
 
 ```txt
+GEMINI_DISABLED=true
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.1-flash-lite
 
@@ -101,6 +102,7 @@ Animemory is configured for a public Vercel deployment. OAuth state and provider
 
 ```txt
 APP_ORIGIN=https://your-domain.vercel.app
+GEMINI_DISABLED=true
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.1-flash-lite
 MAL_CLIENT_ID=
@@ -171,4 +173,4 @@ OAuth state and provider tokens are stored in separate HTTP-only, `Secure`, `Sam
 - MAL tokens refresh automatically when a refresh token is available. Confirm AniList's refresh-token behavior before adding a corresponding flow.
 - Cookie payloads must remain below browser cookie-size limits; Animemory keeps OAuth and provider tokens in separate cookies for this reason.
 - Batch writes are sequential and do not yet include provider-aware retry or rate-limit backoff.
-- The fallback parser is intentionally simple; configure `GEMINI_API_KEY` for better extraction from highly irregular text.
+- The fallback parser is intentionally simple; set `GEMINI_DISABLED=false` and configure `GEMINI_API_KEY` for better extraction from highly irregular text.

@@ -39,7 +39,7 @@ MyAnimeList: http://127.0.0.1:8787/api/auth/mal/callback
 AniList:     http://127.0.0.1:8787/api/auth/anilist/callback
 ```
 
-`GEMINI_API_KEY` is optional. Without it, the app uses deterministic parsing.
+`GEMINI_API_KEY` is optional. Gemini parsing is **disabled by default** via `GEMINI_DISABLED=true` while the fallback parser is being tested. Set `GEMINI_DISABLED=false` and provide `GEMINI_API_KEY` to enable Gemini again.
 
 ## Implementation Guidelines
 

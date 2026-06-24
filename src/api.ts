@@ -26,7 +26,11 @@ export function getAuthStatus(): Promise<AuthStatus> {
 
 export type ParseParser = "gemini" | "fallback";
 
-export type ParseParserReason = "no_api_key" | "gemini_empty" | "gemini_error";
+export type ParseParserReason =
+  | "no_api_key"
+  | "gemini_disabled"
+  | "gemini_empty"
+  | "gemini_error";
 
 export function parseAnimeText(text: string): Promise<{
   entries: ParsedAnimeEntry[];

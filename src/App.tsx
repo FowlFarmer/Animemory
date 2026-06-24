@@ -236,15 +236,17 @@ export function App() {
             </div>
             <span className="paper-count">{text.trim() ? text.trim().split(/\n+/).length : 0}</span>
           </div>
-          <textarea
-            aria-label="Anime list text"
-            id="anime-list-text"
-            name="text"
-            onChange={(event) => setText(event.target.value)}
-            placeholder="One anime per line..."
-            spellCheck={false}
-            value={text}
-          />
+          <div className="paste-body">
+            <textarea
+              aria-label="Anime list text"
+              id="anime-list-text"
+              name="text"
+              onChange={(event) => setText(event.target.value)}
+              placeholder="One anime per line..."
+              spellCheck={false}
+              value={text}
+            />
+          </div>
           <div className="sheet-footer">
             <button
               className="magic-button"

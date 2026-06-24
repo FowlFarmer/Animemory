@@ -1,7 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import { z } from "zod";
-import { config } from "./config.js";
+import { config, isGeminiParserEnabled } from "./config.js";
 import {
   clearProviderToken,
   finishOAuth,
@@ -71,7 +71,7 @@ app.get("/api/auth/status", async (req, res, next) => {
         connected: Boolean(await tokenForProvider(req, res, provider as ProviderId))
       }))
     );
-    res.json({ providers: connected, gemini: Boolean(config.gemini.apiKey) });
+    res.json({ providers: connected, gemini: isGeminiParserEnabled() });
   } catch (error) {
     next(error);
   }
