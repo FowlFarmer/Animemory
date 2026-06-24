@@ -24,7 +24,15 @@ export function getAuthStatus(): Promise<AuthStatus> {
   return request("/api/auth/status");
 }
 
-export function parseAnimeText(text: string): Promise<{ entries: ParsedAnimeEntry[] }> {
+export type ParseParser = "gemini" | "fallback";
+
+export type ParseParserReason = "no_api_key" | "gemini_empty" | "gemini_error";
+
+export function parseAnimeText(text: string): Promise<{
+  entries: ParsedAnimeEntry[];
+  parser: ParseParser;
+  reason?: ParseParserReason;
+}> {
   return request("/api/parse", {
     method: "POST",
     body: JSON.stringify({ text })

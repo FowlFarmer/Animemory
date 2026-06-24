@@ -23,21 +23,34 @@ const parsedEntrySchema = z.object({
 
 const parsedSchema = z.array(parsedEntrySchema);
 
-export async function parseAnimeList(text: string): Promise<ParsedAnimeEntry[]> {
+export type ParseParser = "gemini" | "fallback";
+
+export type ParseParserReason = "no_api_key" | "gemini_empty" | "gemini_error";
+
+export type ParseAnimeListResult = {
+  entries: ParsedAnimeEntry[];
+  parser: ParseParser;
+  reason?: ParseParserReason;
+};
+
+export async function parseAnimeList(text: string): Promise<ParseAnimeListResult> {
   const trimmed = text.trim();
-  if (!trimmed) return [];
+  if (!trimmed) return { entries: [], parser: "fallback" };
 
   if (config.gemini.apiKey) {
     try {
       const geminiParsed = await parseWithGemini(trimmed);
       if (geminiParsed.length) {
         console.log(`[parse] parser=gemini entries=${geminiParsed.length}`);
-        return geminiParsed;
+        return { entries: geminiParsed, parser: "gemini" };
       }
       console.log("[parse] parser=fallback reason=gemini_empty");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.log(`[parse] parser=fallback reason=gemini_error message=${message}`);
+      const entries = parseDeterministically(trimmed);
+      console.log(`[parse] parser=fallback entries=${entries.length}`);
+      return { entries, parser: "fallback", reason: "gemini_error" };
     }
   } else {
     console.log("[parse] parser=fallback reason=no_api_key");
@@ -45,7 +58,11 @@ export async function parseAnimeList(text: string): Promise<ParsedAnimeEntry[]> 
 
   const entries = parseDeterministically(trimmed);
   console.log(`[parse] parser=fallback entries=${entries.length}`);
-  return entries;
+  return {
+    entries,
+    parser: "fallback",
+    reason: config.gemini.apiKey ? "gemini_empty" : "no_api_key"
+  };
 }
 
 function parseDeterministically(text: string): ParsedAnimeEntry[] {

@@ -92,6 +92,11 @@ export function App() {
     setResults({});
     try {
       const parsed = await parseAnimeText(text);
+      console.info(
+        `[animemory] parse parser=${parsed.parser}` +
+          (parsed.reason ? ` reason=${parsed.reason}` : "") +
+          ` entries=${parsed.entries.length}`
+      );
       const matched = await matchAnimeEntries(provider, parsed.entries);
       setMatches(matched.matches);
       setSelectedIds(
@@ -233,6 +238,8 @@ export function App() {
           </div>
           <textarea
             aria-label="Anime list text"
+            id="anime-list-text"
+            name="text"
             onChange={(event) => setText(event.target.value)}
             placeholder="One anime per line..."
             spellCheck={false}
@@ -401,9 +408,11 @@ function MatchCard({
               <input
                 aria-label={`Episodes watched for ${match.entry.title}`}
                 className="progress-input"
+                id={`progress-${match.entry.id}`}
                 inputMode="numeric"
                 max={episodeTotal ?? undefined}
                 min={0}
+                name={`progress-${match.entry.id}`}
                 onChange={(event) => {
                   const raw = event.target.value.trim();
                   onProgress(raw === "" ? undefined : Math.max(0, Number(raw)));

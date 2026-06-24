@@ -80,8 +80,8 @@ app.get("/api/auth/status", async (req, res, next) => {
 app.post("/api/parse", async (req, res, next) => {
   try {
     const body = parseRequestSchema.parse(req.body);
-    const entries = await parseAnimeList(body.text);
-    res.json({ entries });
+    const parsed = await parseAnimeList(body.text);
+    res.json(parsed);
   } catch (error) {
     next(error);
   }
