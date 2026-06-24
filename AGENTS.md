@@ -66,11 +66,10 @@ The Gemini parser uses structured JSON output. When changing its prompt or schem
 
 ## Auth And Tokens
 
-OAuth state and provider tokens are stored in separate AES-256-GCM encrypted HTTP-only cookies. Browser JavaScript cannot read them.
+OAuth state and provider tokens are stored in separate HTTP-only cookies. Browser JavaScript cannot read them.
 
-- Production requires a stable 32-byte base64 `SESSION_ENCRYPTION_KEY` so all Vercel function instances can decrypt the same cookies.
 - The short-lived OAuth cookie contains the state value and MAL PKCE verifier, then is cleared after the callback.
-- Provider cookies carry only their own provider token payload, which keeps each encrypted cookie within browser cookie-size limits.
+- Provider cookies carry only their own provider token payload, which keeps each cookie within browser cookie-size limits.
 - Provider refresh tokens are persisted when returned. MAL refreshes automatically just before expiry; confirm AniList refresh behavior before adding a corresponding flow.
 
 Do not log access tokens, OAuth codes, refresh tokens, or raw provider authorization headers.
@@ -82,6 +81,6 @@ The project currently has no dedicated test runner. Verification should include:
 - `npm run build`
 - Browser smoke test of parsing and matching
 - Authenticated write test only when valid provider OAuth credentials are available
-- Vercel production OAuth smoke test with `SESSION_ENCRYPTION_KEY` configured
+- Vercel production OAuth smoke test
 
 For browser smoke tests, use AniList search first because unauthenticated catalog search works without OAuth.

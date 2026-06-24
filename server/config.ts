@@ -20,8 +20,5 @@ export const config = {
     redirectUri:
       process.env.ANILIST_REDIRECT_URI ??
       "http://127.0.0.1:8787/api/auth/anilist/callback"
-  },
-  session: {
-    encryptionKey: process.env.SESSION_ENCRYPTION_KEY
   }
 };

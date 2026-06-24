@@ -82,7 +82,6 @@ Fill in `.env`:
 ```txt
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.1-flash-lite
-SESSION_ENCRYPTION_KEY=
 
 MAL_CLIENT_ID=
 MAL_CLIENT_SECRET=
@@ -95,14 +94,13 @@ ANILIST_REDIRECT_URI=http://127.0.0.1:8787/api/auth/anilist/callback
 
 ## Deploying To Vercel
 
-Animemory is configured for a public Vercel deployment. OAuth state and provider tokens are encrypted into HTTP-only cookies, so no database or Redis service is required.
+Animemory is configured for a public Vercel deployment. OAuth state and provider tokens live in HTTP-only cookies, so no database or Redis service is required.
 
 1. Push this repository to GitHub and import it into Vercel.
 2. Add these environment variables in Vercel:
 
 ```txt
 APP_ORIGIN=https://your-domain.vercel.app
-SESSION_ENCRYPTION_KEY=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.1-flash-lite
 MAL_CLIENT_ID=
@@ -119,12 +117,6 @@ ANILIST_REDIRECT_URI=https://your-domain.vercel.app/api/auth/anilist/callback
 Use a stable production domain for OAuth callbacks. Preview deployment URLs are intentionally not suitable because they change.
 
 The public OAuth entrypoint is `https://your-domain.vercel.app/api/auth/mal/start`. OAuth functions use direct Vercel API paths so they do not depend on a rewrite rule.
-
-Generate the session encryption key once and add the result to Vercel's environment variables:
-
-```bash
-openssl rand -base64 32
-```
 
 ## Matching Flow
 
@@ -171,12 +163,12 @@ AniList writes through the GraphQL mutation:
 SaveMediaListEntry(mediaId: ..., status: ...)
 ```
 
-OAuth state and provider tokens are AES-256-GCM encrypted before being stored in HTTP-only, `Secure`, `SameSite=Lax` browser cookies. They are never readable by browser JavaScript.
+OAuth state and provider tokens are stored in separate HTTP-only, `Secure`, `SameSite=Lax` browser cookies. They are not readable by browser JavaScript.
 
 ## Current Limitations
 
 - OAuth credentials are required before authenticated writes can be tested.
 - MAL tokens refresh automatically when a refresh token is available. Confirm AniList's refresh-token behavior before adding a corresponding flow.
-- Encrypted cookie payloads must remain below browser cookie-size limits; Animemory keeps OAuth and provider tokens in separate cookies for this reason.
+- Cookie payloads must remain below browser cookie-size limits; Animemory keeps OAuth and provider tokens in separate cookies for this reason.
 - Batch writes are sequential and do not yet include provider-aware retry or rate-limit backoff.
 - The fallback parser is intentionally simple; configure `GEMINI_API_KEY` for better extraction from highly irregular text.
