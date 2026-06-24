@@ -436,14 +436,10 @@ function MatchCard({
         />
         {showProgress ? (
           <label className="progress-field">
-            <span className="progress-label">
-              {activeStatus === "current" || activeStatus === "repeating"
-                ? "Episodes watched"
-                : "Progress"}
-            </span>
+            <span className="progress-label">Progress</span>
             <div className="progress-input-wrap">
               <input
-                aria-label={`Episodes watched for ${match.entry.title}`}
+                aria-label={`Progress for ${match.entry.title}`}
                 className="progress-input"
                 id={`progress-${match.entry.id}`}
                 inputMode="numeric"
