@@ -68,7 +68,7 @@ app.get("/api/auth/status", async (req, res, next) => {
     const connected = await Promise.all(
       Object.keys(providers).map(async (provider) => ({
         id: provider,
-        connected: Boolean(await tokenForProvider(req, provider as ProviderId))
+        connected: Boolean(await tokenForProvider(req, res, provider as ProviderId))
       }))
     );
     res.json({ providers: connected, gemini: Boolean(config.gemini.apiKey) });
@@ -91,7 +91,7 @@ app.post("/api/match", async (req, res, next) => {
   try {
     const body = matchRequestSchema.parse(req.body);
     const provider = getProvider(body.provider);
-    const token = await tokenForProvider(req, body.provider);
+    const token = await tokenForProvider(req, res, body.provider);
     const matches = await matchEntries(provider, body.entries, token);
     res.json({ matches });
   } catch (error) {
@@ -102,7 +102,7 @@ app.post("/api/match", async (req, res, next) => {
 app.post("/api/apply", async (req, res, next) => {
   try {
     const body = applyRequestSchema.parse(req.body);
-    const token = await tokenForProvider(req, body.provider);
+    const token = await tokenForProvider(req, res, body.provider);
     if (!token) {
       res.status(401).json({ error: "not_connected", message: "Connect this provider first." });
       return;
@@ -148,7 +148,7 @@ app.get(["/auth/:provider/callback", "/api/auth/:provider/callback"], async (req
 
 app.post(["/auth/:provider/logout", "/api/auth/:provider/logout"], async (req, res, next) => {
   try {
-    await clearProviderToken(req, providerSchema.parse(req.params.provider));
+    clearProviderToken(res, providerSchema.parse(req.params.provider));
     res.json({ ok: true });
   } catch (error) {
     next(error);

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
-import { Redis } from "@upstash/redis";
-import type { ProviderId } from "./types.js";
+import type { Request, Response } from "express";
 import { config } from "./config.js";
+import type { ProviderId } from "./types.js";
 
 export type ProviderToken = {
   accessToken: string;
@@ -9,85 +9,20 @@ export type ProviderToken = {
   expiresAt?: number;
 };
 
-export type AppSession = {
-  providers: Partial<Record<ProviderId, ProviderToken>>;
-  oauth?: {
-    provider: ProviderId;
-    state: string;
-    codeVerifier?: string;
-    expiresAt: number;
-  };
+export type OAuthState = {
+  provider: ProviderId;
+  state: string;
+  codeVerifier?: string;
+  expiresAt: number;
 };
 
-type EncryptedSession = {
-  ciphertext: string;
-  iv: string;
-  tag: string;
-  version: 1;
-};
-
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
+const OAUTH_COOKIE = "animemory_oauth";
+const PROVIDER_COOKIE_PREFIX = "animemory_token_";
 const OAUTH_TTL_MS = 10 * 60 * 1000;
-const memorySessions = new Map<string, { value: AppSession; expiresAt: number }>();
+const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const developmentKey = crypto.randomBytes(32);
 
-const redis =
-  config.session.redisUrl && config.session.redisToken
-    ? new Redis({
-        url: config.session.redisUrl,
-        token: config.session.redisToken
-      })
-    : null;
-
-export async function readSession(sessionId: string): Promise<AppSession | null> {
-  if (redis) {
-    const encrypted = await redis.get<EncryptedSession>(key(sessionId));
-    return encrypted ? decryptSession(encrypted) : null;
-  }
-
-  const item = memorySessions.get(sessionId);
-  if (!item || item.expiresAt < Date.now()) {
-    memorySessions.delete(sessionId);
-    return null;
-  }
-  return item.value;
-}
-
-export async function writeSession(sessionId: string, session: AppSession): Promise<void> {
-  if (config.isProduction && !redis) {
-    throw new Error("UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production.");
-  }
-
-  if (redis) {
-    await redis.set(key(sessionId), encryptSession(session), { ex: SESSION_TTL_SECONDS });
-    return;
-  }
-
-  memorySessions.set(sessionId, {
-    value: session,
-    expiresAt: Date.now() + SESSION_TTL_SECONDS * 1000
-  });
-}
-
-export async function deleteSession(sessionId: string): Promise<void> {
-  if (redis) {
-    await redis.del(key(sessionId));
-    return;
-  }
-  memorySessions.delete(sessionId);
-}
-
-export function createSessionId(): string {
-  return crypto.randomBytes(32).toString("base64url");
-}
-
-export function newSession(): AppSession {
-  return { providers: {} };
-}
-
-export function newOauthState(
-  provider: ProviderId,
-  codeVerifier?: string
-): NonNullable<AppSession["oauth"]> {
+export function newOauthState(provider: ProviderId, codeVerifier?: string): OAuthState {
   return {
     provider,
     state: crypto.randomBytes(24).toString("base64url"),
@@ -96,43 +31,97 @@ export function newOauthState(
   };
 }
 
-function key(sessionId: string): string {
-  return `animemory:session:${sessionId}`;
+export function readOAuthState(req: Request): OAuthState | null {
+  return unseal<OAuthState>(req.cookies?.[OAUTH_COOKIE]);
 }
 
-function encryptSession(session: AppSession): EncryptedSession {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey(), iv);
-  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(session), "utf8"), cipher.final()]);
+export function writeOAuthState(res: Response, state: OAuthState): void {
+  writeCookie(res, OAUTH_COOKIE, state, OAUTH_TTL_MS);
+}
 
+export function clearOAuthState(res: Response): void {
+  res.clearCookie(OAUTH_COOKIE, cookieOptions());
+}
+
+export function readProviderToken(req: Request, provider: ProviderId): ProviderToken | null {
+  return unseal<ProviderToken>(req.cookies?.[providerCookieName(provider)]);
+}
+
+export function writeProviderToken(
+  res: Response,
+  provider: ProviderId,
+  token: ProviderToken
+): void {
+  writeCookie(res, providerCookieName(provider), token, TOKEN_TTL_MS);
+}
+
+export function clearProviderTokenCookie(res: Response, provider: ProviderId): void {
+  res.clearCookie(providerCookieName(provider), cookieOptions());
+}
+
+function writeCookie<T>(res: Response, name: string, value: T, maxAge: number): void {
+  res.cookie(name, seal(value), { ...cookieOptions(), maxAge });
+}
+
+function cookieOptions() {
   return {
-    ciphertext: ciphertext.toString("base64url"),
-    iv: iv.toString("base64url"),
-    tag: cipher.getAuthTag().toString("base64url"),
-    version: 1
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: config.isProduction,
+    path: "/"
   };
 }
 
-function decryptSession(value: EncryptedSession): AppSession {
-  if (value.version !== 1) throw new Error("Unsupported session record version.");
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    encryptionKey(),
-    Buffer.from(value.iv, "base64url")
-  );
-  decipher.setAuthTag(Buffer.from(value.tag, "base64url"));
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(value.ciphertext, "base64url")),
-    decipher.final()
-  ]);
-  return JSON.parse(plaintext.toString("utf8")) as AppSession;
+function providerCookieName(provider: ProviderId): string {
+  return `${PROVIDER_COOKIE_PREFIX}${provider}`;
+}
+
+function seal(value: unknown): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKey(), iv);
+  const ciphertext = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
+  const token = [iv, cipher.getAuthTag(), ciphertext]
+    .map((part) => part.toString("base64url"))
+    .join(".");
+
+  if (token.length > 3800) {
+    throw new Error("Encrypted provider token is too large for a browser cookie.");
+  }
+
+  return token;
+}
+
+function unseal<T>(value: unknown): T | null {
+  if (typeof value !== "string") return null;
+  const [iv, tag, ciphertext, extra] = value.split(".");
+  if (!iv || !tag || !ciphertext || extra) return null;
+
+  try {
+    const decipher = crypto.createDecipheriv(
+      "aes-256-gcm",
+      encryptionKey(),
+      Buffer.from(iv, "base64url")
+    );
+    decipher.setAuthTag(Buffer.from(tag, "base64url"));
+    const plaintext = Buffer.concat([
+      decipher.update(Buffer.from(ciphertext, "base64url")),
+      decipher.final()
+    ]);
+    return JSON.parse(plaintext.toString("utf8")) as T;
+  } catch {
+    return null;
+  }
 }
 
 function encryptionKey(): Buffer {
   const raw = config.session.encryptionKey;
   if (!raw) {
-    throw new Error("SESSION_ENCRYPTION_KEY is required whenever Redis sessions are enabled.");
+    if (config.isProduction) {
+      throw new Error("SESSION_ENCRYPTION_KEY is required in production.");
+    }
+    return developmentKey;
   }
+
   const key = Buffer.from(raw, "base64");
   if (key.length !== 32) {
     throw new Error("SESSION_ENCRYPTION_KEY must be a 32-byte base64 value.");

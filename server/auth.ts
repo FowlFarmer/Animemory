@@ -3,13 +3,14 @@ import type { Request, Response } from "express";
 import { config } from "./config.js";
 import { readJson } from "./lib/http.js";
 import {
-  createSessionId,
+  clearOAuthState,
+  clearProviderTokenCookie,
   newOauthState,
-  newSession,
-  readSession,
-  type AppSession,
+  readOAuthState,
+  readProviderToken,
   type ProviderToken,
-  writeSession
+  writeOAuthState,
+  writeProviderToken
 } from "./session.js";
 import type { ProviderId } from "./types.js";
 
@@ -20,18 +21,14 @@ type TokenResponse = {
   token_type: string;
 };
 
-const SESSION_COOKIE = "animemory_session";
-
 export async function startOAuth(
   provider: ProviderId,
-  req: Request,
+  _req: Request,
   res: Response
 ): Promise<void> {
-  const { sessionId, session } = await loadOrCreateSession(req, res);
   const verifier = provider === "mal" ? crypto.randomBytes(64).toString("base64url") : undefined;
   const oauth = newOauthState(provider, verifier);
-  session.oauth = oauth;
-  await writeSession(sessionId, session);
+  writeOAuthState(res, oauth);
 
   if (provider === "mal") {
     const url = new URL("https://myanimelist.net/v1/oauth2/authorize");
@@ -60,19 +57,16 @@ export async function finishOAuth(
 ): Promise<void> {
   const code = String(req.query.code ?? "");
   const state = String(req.query.state ?? "");
-  const sessionId = readSessionId(req);
-  const session = sessionId ? await readSession(sessionId) : null;
-  const oauth = session?.oauth;
+  const oauth = readOAuthState(req);
 
   if (
     !code ||
-    !sessionId ||
-    !session ||
     !oauth ||
     oauth.provider !== provider ||
     oauth.state !== state ||
     oauth.expiresAt < Date.now()
   ) {
+    clearOAuthState(res);
     res.redirect(`${config.appOrigin}?auth=${provider}&error=invalid_state`);
     return;
   }
@@ -82,21 +76,18 @@ export async function finishOAuth(
       ? await exchangeMalToken(code, oauth.codeVerifier)
       : await exchangeAniListToken(code);
 
-  session.providers[provider] = toProviderToken(token);
-  delete session.oauth;
-  await writeSession(sessionId, session);
+  clearOAuthState(res);
+  writeProviderToken(res, provider, toProviderToken(token));
   res.redirect(`${config.appOrigin}?auth=${provider}&connected=true`);
 }
 
 export async function tokenForProvider(
   req: Request,
+  res: Response,
   provider: ProviderId
 ): Promise<string | undefined> {
-  const sessionId = readSessionId(req);
-  if (!sessionId) return undefined;
-  const session = await readSession(sessionId);
-  const stored = session?.providers[provider];
-  if (!session || !stored) return undefined;
+  const stored = readProviderToken(req, provider);
+  if (!stored) return undefined;
 
   if (
     provider === "mal" &&
@@ -105,48 +96,16 @@ export async function tokenForProvider(
     stored.expiresAt <= Date.now() + 60_000
   ) {
     const refreshed = await refreshMalToken(stored.refreshToken);
-    session.providers.mal = toProviderToken(refreshed);
-    await writeSession(sessionId, session);
-    return session.providers.mal.accessToken;
+    const token = toProviderToken(refreshed);
+    writeProviderToken(res, provider, token);
+    return token.accessToken;
   }
 
   return stored.accessToken;
 }
 
-export async function clearProviderToken(
-  req: Request,
-  provider: ProviderId
-): Promise<void> {
-  const sessionId = readSessionId(req);
-  if (!sessionId) return;
-  const session = await readSession(sessionId);
-  if (!session) return;
-
-  delete session.providers[provider];
-  await writeSession(sessionId, session);
-}
-
-async function loadOrCreateSession(
-  req: Request,
-  res: Response
-): Promise<{ sessionId: string; session: AppSession }> {
-  const existingId = readSessionId(req);
-  const existing = existingId ? await readSession(existingId) : null;
-  if (existingId && existing) return { sessionId: existingId, session: existing };
-
-  const sessionId = createSessionId();
-  res.cookie(SESSION_COOKIE, sessionId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: config.isProduction,
-    path: "/",
-    maxAge: 1000 * 60 * 60 * 24 * 30
-  });
-  return { sessionId, session: newSession() };
-}
-
-function readSessionId(req: Request): string | undefined {
-  return req.cookies?.[SESSION_COOKIE];
+export function clearProviderToken(res: Response, provider: ProviderId): void {
+  clearProviderTokenCookie(res, provider);
 }
 
 function toProviderToken(token: TokenResponse): ProviderToken {

@@ -22,8 +22,6 @@ export const config = {
       "http://127.0.0.1:8787/api/auth/anilist/callback"
   },
   session: {
-    redisUrl: process.env.UPSTASH_REDIS_REST_URL,
-    redisToken: process.env.UPSTASH_REDIS_REST_TOKEN,
     encryptionKey: process.env.SESSION_ENCRYPTION_KEY
   }
 };
