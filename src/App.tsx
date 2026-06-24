@@ -434,36 +434,42 @@ function MatchCard({
           tone="butter"
           value={score}
         />
-        {showProgress ? (
-          <label className="progress-field">
-            <span className="progress-label">Progress</span>
-            <div className="progress-input-wrap">
-              <input
-                aria-label={`Progress for ${match.entry.title}`}
-                className="progress-input"
-                id={`progress-${match.entry.id}`}
-                inputMode="numeric"
-                max={episodeTotal ?? undefined}
-                min={0}
-                name={`progress-${match.entry.id}`}
-                onChange={(event) => {
-                  const raw = event.target.value.trim();
-                  onProgress(raw === "" ? undefined : Math.max(0, Number(raw)));
-                }}
-                placeholder="0"
-                type="number"
-                value={progress ?? ""}
-              />
-              {episodeTotal ? <span className="progress-total">/ {episodeTotal}</span> : null}
-            </div>
-          </label>
-        ) : null}
-        {result ? (
-          <span className={result === "Saved" ? "result-badge good" : "result-badge bad"}>
-            {result === "Saved" ? <CheckCircle2 size={15} /> : <CircleAlert size={15} />}
-            {result}
-          </span>
-        ) : null}
+        <label className={`progress-field${showProgress ? "" : " is-disabled"}`}>
+          <span className="progress-label">Progress</span>
+          <div className="progress-input-wrap">
+            <input
+              aria-label={`Progress for ${match.entry.title}`}
+              className="progress-input"
+              disabled={!showProgress}
+              id={`progress-${match.entry.id}`}
+              inputMode="numeric"
+              max={episodeTotal ?? undefined}
+              min={0}
+              name={`progress-${match.entry.id}`}
+              onChange={(event) => {
+                const raw = event.target.value.trim();
+                onProgress(raw === "" ? undefined : Math.max(0, Number(raw)));
+              }}
+              placeholder="0"
+              type="number"
+              value={progress ?? ""}
+            />
+            {episodeTotal ? <span className="progress-total">/ {episodeTotal}</span> : null}
+          </div>
+        </label>
+        <span
+          aria-hidden={!result}
+          className={
+            result === "Saved"
+              ? "result-badge good"
+              : result
+                ? "result-badge bad"
+                : "result-badge result-badge-empty"
+          }
+        >
+          {result === "Saved" ? <CheckCircle2 size={15} /> : result ? <CircleAlert size={15} /> : null}
+          {result ?? "Saved"}
+        </span>
       </div>
     </article>
   );

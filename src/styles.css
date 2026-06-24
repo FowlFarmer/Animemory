@@ -155,17 +155,17 @@ h2 { color: var(--ink); font-size: 1.5rem; letter-spacing: 0; line-height: 1; ma
 .empty-review { align-items: center; border: 2px dashed #cfc3f5; border-radius: 18px 22px 17px 21px; color: var(--lilac-deep); display: grid; justify-items: center; min-height: 360px; padding: 24px; text-align: center; }
 .empty-review p { font-family: "Patrick Hand", cursive; font-size: 1.3rem; margin-bottom: 0; }
 
-.match-card { align-items: start; background: var(--paper); border: 2px solid #ded9e4; border-radius: 16px 13px 18px 14px / 15px 18px 14px 17px; box-shadow: 3px 4px 0 rgba(119, 103, 184, .08); display: grid; gap: 12px 14px; grid-template-columns: 32px 60px minmax(0, 1fr) minmax(170px, 200px); overflow: visible; padding: 14px 14px 16px; transition: transform 150ms ease, box-shadow 150ms ease; }
+.match-card { align-items: start; background: var(--paper); border: 2px solid #ded9e4; border-radius: 16px 13px 18px 14px / 15px 18px 14px 17px; box-shadow: 3px 4px 0 rgba(119, 103, 184, .08); display: grid; gap: 12px 14px; grid-template-columns: 32px 60px minmax(0, 1fr) minmax(170px, 200px); grid-template-rows: auto; min-height: 214px; overflow: visible; padding: 14px 14px 16px; transition: box-shadow 150ms ease, transform 150ms ease; }
 .match-card:hover { box-shadow: 5px 6px 0 rgba(119, 103, 184, .13); transform: translateY(-2px) rotate(-.1deg); }
 .entry-number { align-self: start; color: #c1b6e9; font-family: "Patrick Hand", cursive; font-size: 1rem; padding-top: 10px; text-align: center; }
-.cover-art { align-self: start; aspect-ratio: 2 / 3; background: #e8eef5; border: 1px solid #c8d5e3; border-radius: 7px 8px 6px 9px; overflow: hidden; width: 60px; }
+.cover-art { align-self: start; aspect-ratio: 2 / 3; background: #e8eef5; border: 1px solid #c8d5e3; border-radius: 7px 8px 6px 9px; flex-shrink: 0; height: 90px; overflow: hidden; width: 60px; }
 .cover-art img { display: block; height: 100%; object-fit: cover; width: 100%; }
-.cover-placeholder { display: block; height: 100%; min-height: 90px; }
-.match-details { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.source-note { color: var(--muted); font-family: "Patrick Hand", cursive; font-size: 1rem; line-height: 1.15; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.entry-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.cover-placeholder { display: block; height: 100%; }
+.match-details { display: flex; flex-direction: column; gap: 8px; min-height: 118px; min-width: 0; }
+.source-note { color: var(--muted); font-family: "Patrick Hand", cursive; font-size: 1rem; line-height: 1.15; margin: 0; min-height: 1.15em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry-meta { align-items: center; display: flex; flex-wrap: wrap; gap: 6px; margin: 0; min-height: 28px; }
 .entry-meta span { background: #f1eeff; border-radius: 999px; color: var(--lilac-deep); font-family: "Patrick Hand", cursive; font-size: .9rem; line-height: 1.1; padding: 4px 8px; }
-.entry-actions { align-content: start; align-self: stretch; display: grid; gap: 8px; min-width: 0; }
+.entry-actions { align-content: start; align-self: stretch; display: grid; gap: 8px; grid-template-rows: 36px 36px 54px 24px; min-height: 166px; min-width: 0; }
 
 .bubble-select { isolation: isolate; position: relative; width: 100%; }
 .bubble-select.is-open { z-index: 50; }
@@ -191,14 +191,19 @@ h2 { color: var(--ink); font-size: 1.5rem; letter-spacing: 0; line-height: 1; ma
 .bubble-select.butter .bubble-select-option.is-selected,
 .bubble-select-menu.butter .bubble-select-option.is-selected { background: #fff0b8; color: #7a5a17; }
 
-.progress-field { display: grid; gap: 4px; }
+.progress-field { display: grid; gap: 4px; min-height: 54px; }
+.progress-field.is-disabled { opacity: .5; }
+.progress-field.is-disabled .progress-input-wrap { background: #f4f4f4; border-color: #ddd; box-shadow: none; }
+.progress-field.is-disabled .progress-input { color: #9aa3b5; cursor: not-allowed; }
+.progress-field.is-disabled .progress-label, .progress-field.is-disabled .progress-total { color: #9aa3b5; }
 .progress-label { color: #327060; font-family: "Patrick Hand", cursive; font-size: .92rem; line-height: 1; }
 .progress-input-wrap { align-items: center; background: #ecfbf5; border: 2px solid #b5dfd2; border-radius: 11px 9px 12px 10px / 10px 12px 9px 11px; box-shadow: 2px 2px 0 rgba(63, 157, 136, .12); display: flex; gap: 4px; min-height: 36px; padding: 0 10px; }
 .progress-input { appearance: textfield; background: transparent; border: 0; color: #327060; font-family: "Baloo 2", ui-rounded, sans-serif; font-size: .92rem; font-weight: 800; min-width: 0; outline: 0; width: 100%; }
 .progress-input::-webkit-outer-spin-button, .progress-input::-webkit-inner-spin-button { appearance: none; margin: 0; }
 .progress-total { color: #5d9988; font-family: "Patrick Hand", cursive; font-size: .95rem; white-space: nowrap; }
 
-.result-badge { align-items: center; border-radius: 999px; display: inline-flex; font-family: "Patrick Hand", cursive; font-size: .95rem; gap: 4px; justify-self: start; line-height: 1; padding: 4px 8px; }
+.result-badge { align-items: center; border-radius: 999px; display: inline-flex; font-family: "Patrick Hand", cursive; font-size: .95rem; gap: 4px; justify-self: start; line-height: 1; min-height: 24px; padding: 4px 8px; }
+.result-badge-empty { opacity: 0; pointer-events: none; user-select: none; }
 .result-badge.good { background: #dff6e9; color: #2f7e5b; }
 .result-badge.bad { background: #ffe1e6; color: #b14868; }
 
@@ -239,9 +244,9 @@ h2 { color: var(--ink); font-size: 1.5rem; letter-spacing: 0; line-height: 1; ma
   .magic-button, .save-button { width: 100%; }
   .review-sheet { padding-top: 0; }
   .review-topline { align-items: stretch; flex-direction: column; }
-  .match-card { gap: 10px; grid-template-columns: 28px 52px minmax(0, 1fr); grid-template-rows: auto auto; padding: 13px 13px 15px; }
-  .match-details { grid-column: 3; }
-  .entry-actions { gap: 8px; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); padding-left: 40px; }
+  .match-card { gap: 10px; grid-template-columns: 28px 52px minmax(0, 1fr); grid-template-rows: auto auto; min-height: 248px; padding: 13px 13px 15px; }
+  .match-details { grid-column: 3; min-height: 0; }
+  .entry-actions { gap: 8px; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: 36px 54px 24px; min-height: 130px; padding-left: 40px; }
   .entry-actions .progress-field { grid-column: 1 / -1; }
   .entry-actions .result-badge { grid-column: 1 / -1; }
 }
