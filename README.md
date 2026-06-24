@@ -123,6 +123,8 @@ ANILIST_REDIRECT_URI=https://your-domain.vercel.app/auth/anilist/callback
 
 Use a stable production domain for OAuth callbacks. Preview deployment URLs are intentionally not suitable because they change.
 
+The public OAuth entrypoint is `https://your-domain.vercel.app/auth/mal/start`. Vercel rewrites `/auth/:path*` to the serverless API function while leaving the public URL unchanged.
+
 Generate the session encryption key once and add the result to Vercel's environment variables:
 
 ```bash
