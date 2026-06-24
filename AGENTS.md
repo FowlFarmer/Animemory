@@ -1,0 +1,87 @@
+# Animemory Agent Notes
+
+## Project Purpose
+
+Animemory is a web app for importing messy, pasted anime lists into a user's MyAnimeList or AniList account. The important product constraint is that list writes must be reviewed by the user before they happen. LLMs can help parse text, but they should not directly choose and mutate provider entries without a review step.
+
+## Current Stack
+
+- React + Vite client in `src/`.
+- Express API server in `server/`.
+- Provider adapters live in `server/providers/`.
+- Parsing and matching services live in `server/services/`.
+- Shared server types live in `server/types.ts`.
+- Client-side API/types live in `src/api.ts` and `src/types.ts`.
+
+## Development Commands
+
+```bash
+npm install
+npm run dev
+npm run build
+```
+
+`npm run dev` starts:
+
+- Vite client at `http://127.0.0.1:5173`
+- Express API at `http://127.0.0.1:8787`
+
+Run `npm run build` before handing off meaningful code changes. It performs TypeScript checking and a production Vite build.
+
+## Environment
+
+Copy `.env.example` to `.env`.
+
+OAuth callback URLs for local development:
+
+```txt
+MyAnimeList: http://127.0.0.1:8787/auth/mal/callback
+AniList:     http://127.0.0.1:8787/auth/anilist/callback
+```
+
+`OPENAI_API_KEY` is optional. Without it, the app uses deterministic parsing.
+
+## Implementation Guidelines
+
+- Keep MAL and AniList behavior behind the `Provider` interface in `server/types.ts`.
+- Normalize app-level statuses first, then map to provider-specific values in `server/providers/status.ts`.
+- Avoid provider-specific logic in React components.
+- Keep `/api/parse`, `/api/match`, and `/api/apply` as separate steps.
+- Never apply entries that the browser UI has not selected.
+- Prefer title-only provider search plus local candidate ranking. Years should influence ranking rather than being appended to every search query.
+- Treat provider IDs as provider-scoped. Store `malId` and `anilistId` separately when both are available.
+- Add rate-limit handling before increasing batch sizes or automatic retries.
+
+## LLM Guidance
+
+Use the LLM for extraction and disambiguation hints, not as the sole source of truth. The preferred flow is:
+
+1. Extract structured entries from messy text.
+2. Search the selected provider's real catalog.
+3. Rank candidates deterministically.
+4. Let the user review and override matches.
+5. Write only selected entries.
+
+When changing prompts, preserve the JSON contract expected by `server/services/parser.ts`.
+
+## Auth And Tokens
+
+The browser holds a single opaque `animemory_session` cookie. OAuth state and provider tokens are stored in the session record, never in browser-readable storage.
+
+- Local development uses an in-memory session store.
+- Production requires Upstash Redis through `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, plus a 32-byte base64 `SESSION_ENCRYPTION_KEY`.
+- The OAuth state and MAL PKCE verifier live in the short-lived session record, which makes the callback safe on Vercel's serverless runtime.
+- Provider refresh tokens are persisted when returned. MAL refreshes automatically just before expiry; confirm AniList refresh behavior before adding a corresponding flow.
+
+Do not log access tokens, OAuth codes, refresh tokens, or raw provider authorization headers.
+
+## Testing Notes
+
+The project currently has no dedicated test runner. Verification should include:
+
+- `npm run build`
+- Browser smoke test of parsing and matching
+- Authenticated write test only when valid provider OAuth credentials are available
+- Vercel production smoke test with an Upstash Redis database configured
+
+For browser smoke tests, use AniList search first because unauthenticated catalog search works without OAuth.
