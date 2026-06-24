@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Check,
   CheckCircle2,
-  ChevronDown,
   CircleAlert,
   Link2,
   Loader2,
@@ -17,12 +15,12 @@ import {
   matchAnimeEntries,
   parseAnimeText
 } from "./api";
+import { BubbleSelect } from "./components/BubbleSelect";
 import type {
   AnimeCandidate,
   AuthStatus,
   MatchResult,
   NormalizedStatus,
-  ParsedAnimeEntry,
   ProviderId,
   SaveSelection
 } from "./types";
@@ -36,6 +34,11 @@ const STATUS_OPTIONS: Array<{ value: NormalizedStatus; label: string }> = [
   { value: "repeating", label: "Rewatching" }
 ];
 
+const SCORE_OPTIONS = Array.from({ length: 10 }, (_, index) => {
+  const score = index + 1;
+  return { value: score, label: `${score}/10` };
+});
+
 const PROVIDERS: Array<{ id: ProviderId; label: string; accent: string }> = [
   { id: "mal", label: "MyAnimeList", accent: "blue" },
   { id: "anilist", label: "AniList", accent: "violet" }
@@ -47,6 +50,10 @@ Steins;Gate (2011) finished score 9
 Mob Psycho 100 III, done, 8.5/10
 Dungeon Meshi plan to watch`;
 
+function statusUsesProgress(status?: NormalizedStatus): boolean {
+  return status !== undefined && status !== "planning";
+}
+
 export function App() {
   const [provider, setProvider] = useState<ProviderId>("mal");
   const [auth, setAuth] = useState<AuthStatus | null>(null);
@@ -54,6 +61,8 @@ export function App() {
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [selectedIds, setSelectedIds] = useState<Record<string, number | undefined>>({});
   const [statuses, setStatuses] = useState<Record<string, NormalizedStatus | undefined>>({});
+  const [scores, setScores] = useState<Record<string, number | undefined>>({});
+  const [progress, setProgress] = useState<Record<string, number | undefined>>({});
   const [busy, setBusy] = useState<"parse" | "apply" | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, string>>({});
@@ -95,6 +104,16 @@ export function App() {
           matched.matches.map((match) => [match.entry.id, match.entry.status ?? "planning"])
         )
       );
+      setScores(
+        Object.fromEntries(
+          matched.matches.map((match) => [match.entry.id, match.entry.score])
+        )
+      );
+      setProgress(
+        Object.fromEntries(
+          matched.matches.map((match) => [match.entry.id, match.entry.progress])
+        )
+      );
       setMessage(`${matched.matches.length} matches found.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "That list could not be matched yet.");
@@ -110,12 +129,13 @@ export function App() {
       const selections: SaveSelection[] = matches.flatMap((match) => {
         const providerAnimeId = selectedIds[match.entry.id];
         if (!providerAnimeId) return [];
+        const entryStatus = statuses[match.entry.id];
         return [{
           parsedId: match.entry.id,
           providerAnimeId,
-          status: statuses[match.entry.id],
-          score: match.entry.score,
-          progress: match.entry.progress,
+          status: entryStatus,
+          score: scores[match.entry.id],
+          progress: statusUsesProgress(entryStatus) ? progress[match.entry.id] : undefined,
           notes: match.entry.notes
         }];
       });
@@ -142,6 +162,19 @@ export function App() {
     await disconnectProvider(provider);
     await refreshAuth();
     setMessage(`${activeProvider.label} disconnected.`);
+  }
+
+  function updateStatus(match: MatchResult, nextStatus: NormalizedStatus) {
+    setStatuses((current) => ({ ...current, [match.entry.id]: nextStatus }));
+
+    if (nextStatus === "completed") {
+      const selected = match.candidates.find(
+        (candidate) => candidate.providerId === selectedIds[match.entry.id]
+      );
+      if (selected?.episodes) {
+        setProgress((current) => ({ ...current, [match.entry.id]: selected.episodes! }));
+      }
+    }
   }
 
   return (
@@ -252,18 +285,24 @@ export function App() {
                   index={index + 1}
                   key={match.entry.id}
                   match={match}
+                  progress={progress[match.entry.id]}
                   result={results[match.entry.id]}
+                  score={scores[match.entry.id]}
                   selectedId={selectedIds[match.entry.id]}
                   status={statuses[match.entry.id]}
+                  onProgress={(value) =>
+                    setProgress((current) => ({ ...current, [match.entry.id]: value }))
+                  }
+                  onScore={(value) =>
+                    setScores((current) => ({ ...current, [match.entry.id]: value }))
+                  }
                   onSelect={(candidate) =>
                     setSelectedIds((current) => ({
                       ...current,
                       [match.entry.id]: candidate?.providerId
                     }))
                   }
-                  onStatus={(nextStatus) =>
-                    setStatuses((current) => ({ ...current, [match.entry.id]: nextStatus }))
-                  }
+                  onStatus={(nextStatus) => updateStatus(match, nextStatus)}
                 />
               ))
             )}
@@ -279,19 +318,30 @@ function MatchCard({
   match,
   selectedId,
   status,
+  score,
+  progress,
   result,
   onSelect,
-  onStatus
+  onStatus,
+  onScore,
+  onProgress
 }: {
   index: number;
   match: MatchResult;
   selectedId?: number;
   status?: NormalizedStatus;
+  score?: number;
+  progress?: number;
   result?: string;
   onSelect: (candidate?: AnimeCandidate) => void;
   onStatus: (status: NormalizedStatus) => void;
+  onScore: (score?: number) => void;
+  onProgress: (progress?: number) => void;
 }) {
+  const activeStatus = status ?? "planning";
   const selected = match.candidates.find((candidate) => candidate.providerId === selectedId);
+  const showProgress = statusUsesProgress(activeStatus);
+  const episodeTotal = selected?.episodes ?? undefined;
 
   return (
     <article className="match-card">
@@ -301,46 +351,71 @@ function MatchCard({
       </div>
       <div className="match-details">
         <p className="source-note">{match.entry.raw}</p>
-        <label className="select-wrap">
-          <span className="sr-only">Match for {match.entry.title}</span>
-          <select
-            aria-label={`Match for ${match.entry.title}`}
-            onChange={(event) => {
-              const nextId = Number(event.target.value);
-              onSelect(match.candidates.find((candidate) => candidate.providerId === nextId));
-            }}
-            value={selectedId ?? ""}
-          >
-            <option value="">Keep this one aside</option>
-            {match.candidates.map((candidate) => (
-              <option key={candidate.providerId} value={candidate.providerId}>
-                {candidate.title}{candidate.year ? ` (${candidate.year})` : ""}
-              </option>
-            ))}
-          </select>
-          <ChevronDown aria-hidden="true" size={16} />
-        </label>
+        <BubbleSelect
+          allowEmpty
+          ariaLabel={`Match for ${match.entry.title}`}
+          emptyLabel="Keep this one aside"
+          onChange={(nextId) =>
+            onSelect(match.candidates.find((candidate) => candidate.providerId === nextId))
+          }
+          options={match.candidates.map((candidate) => ({
+            value: candidate.providerId,
+            label: candidate.title,
+            hint: candidate.year ? String(candidate.year) : undefined
+          }))}
+          placeholder="Pick a match"
+          tone="lilac"
+          value={selectedId}
+        />
         <div className="entry-meta">
           <span>{Math.round(match.confidence * 100)}% match</span>
-          {selected?.episodes ? <span>{selected.episodes} eps</span> : null}
-          {match.entry.score !== undefined ? <span>{match.entry.score}/10</span> : null}
-          {match.entry.progress !== undefined ? <span>ep {match.entry.progress}</span> : null}
+          {episodeTotal ? <span>{episodeTotal} eps total</span> : null}
         </div>
       </div>
       <div className="entry-actions">
-        <label className="status-select">
-          <span className="sr-only">Status for {match.entry.title}</span>
-          <select
-            aria-label={`Status for ${match.entry.title}`}
-            onChange={(event) => onStatus(event.target.value as NormalizedStatus)}
-            value={status ?? "planning"}
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
-            ))}
-          </select>
-          <ChevronDown aria-hidden="true" size={15} />
-        </label>
+        <BubbleSelect
+          ariaLabel={`Status for ${match.entry.title}`}
+          onChange={(nextStatus) => onStatus(nextStatus!)}
+          options={STATUS_OPTIONS}
+          tone="mint"
+          value={activeStatus}
+        />
+        <BubbleSelect
+          allowEmpty
+          ariaLabel={`Score for ${match.entry.title}`}
+          emptyLabel="No score"
+          onChange={onScore}
+          options={SCORE_OPTIONS}
+          placeholder="Score"
+          tone="butter"
+          value={score}
+        />
+        {showProgress ? (
+          <label className="progress-field">
+            <span className="progress-label">
+              {activeStatus === "current" || activeStatus === "repeating"
+                ? "Episodes watched"
+                : "Progress"}
+            </span>
+            <div className="progress-input-wrap">
+              <input
+                aria-label={`Episodes watched for ${match.entry.title}`}
+                className="progress-input"
+                inputMode="numeric"
+                max={episodeTotal ?? undefined}
+                min={0}
+                onChange={(event) => {
+                  const raw = event.target.value.trim();
+                  onProgress(raw === "" ? undefined : Math.max(0, Number(raw)));
+                }}
+                placeholder="0"
+                type="number"
+                value={progress ?? ""}
+              />
+              {episodeTotal ? <span className="progress-total">/ {episodeTotal}</span> : null}
+            </div>
+          </label>
+        ) : null}
         {result ? (
           <span className={result === "Saved" ? "result-badge good" : "result-badge bad"}>
             {result === "Saved" ? <CheckCircle2 size={15} /> : <CircleAlert size={15} />}

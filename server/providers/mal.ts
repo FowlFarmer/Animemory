@@ -56,6 +56,7 @@ export const malProvider: Provider = {
     const status = toMalStatus(selection.status);
 
     if (status) body.set("status", status);
+    if (selection.status === "repeating") body.set("is_rewatching", "true");
     if (selection.score !== undefined) body.set("score", String(Math.round(selection.score)));
     if (selection.progress !== undefined) {
       body.set("num_watched_episodes", String(selection.progress));

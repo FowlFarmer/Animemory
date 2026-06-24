@@ -28,11 +28,24 @@ export async function parseAnimeList(text: string): Promise<ParsedAnimeEntry[]> 
   if (!trimmed) return [];
 
   if (config.gemini.apiKey) {
-    const geminiParsed = await parseWithGemini(trimmed).catch(() => null);
-    if (geminiParsed?.length) return geminiParsed;
+    try {
+      const geminiParsed = await parseWithGemini(trimmed);
+      if (geminiParsed.length) {
+        console.log(`[parse] parser=gemini entries=${geminiParsed.length}`);
+        return geminiParsed;
+      }
+      console.log("[parse] parser=fallback reason=gemini_empty");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.log(`[parse] parser=fallback reason=gemini_error message=${message}`);
+    }
+  } else {
+    console.log("[parse] parser=fallback reason=no_api_key");
   }
 
-  return parseDeterministically(trimmed);
+  const entries = parseDeterministically(trimmed);
+  console.log(`[parse] parser=fallback entries=${entries.length}`);
+  return entries;
 }
 
 function parseDeterministically(text: string): ParsedAnimeEntry[] {

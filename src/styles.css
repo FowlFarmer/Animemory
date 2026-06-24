@@ -25,12 +25,12 @@
 
 body { margin: 0; min-width: 320px; min-height: 100vh; }
 
-button, a, select, textarea { font: inherit; }
+button, a, textarea { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .55; }
-button:focus-visible, a:focus-visible, select:focus-visible, textarea:focus-visible {
+button:focus-visible, a:focus-visible, textarea:focus-visible, .bubble-select-trigger:focus-visible, .bubble-select-option:focus-visible, .progress-input:focus-visible {
   outline: 3px solid rgba(119, 103, 184, .42);
   outline-offset: 3px;
 }
@@ -96,21 +96,43 @@ textarea::placeholder { color: #a3acc0; }
 .empty-review { align-items: center; border: 2px dashed #cfc3f5; border-radius: 18px 22px 17px 21px; color: var(--lilac-deep); display: grid; justify-items: center; min-height: 360px; padding: 24px; text-align: center; }
 .empty-review p { font-family: "Patrick Hand", cursive; font-size: 1.3rem; margin-bottom: 0; }
 
-.match-card { align-items: center; background: var(--paper); border: 2px solid #ded9e4; border-radius: 16px 13px 18px 14px / 15px 18px 14px 17px; box-shadow: 3px 4px 0 rgba(119, 103, 184, .08); display: grid; gap: 12px; grid-template-columns: 30px 54px minmax(0, 1fr) 138px; min-height: 92px; padding: 11px; transition: transform 150ms ease, box-shadow 150ms ease; }
+.match-card { align-items: start; background: var(--paper); border: 2px solid #ded9e4; border-radius: 16px 13px 18px 14px / 15px 18px 14px 17px; box-shadow: 3px 4px 0 rgba(119, 103, 184, .08); display: grid; gap: 12px; grid-template-columns: 30px 54px minmax(0, 1fr) minmax(156px, 178px); min-height: 92px; padding: 11px; transition: transform 150ms ease, box-shadow 150ms ease; }
 .match-card:hover { box-shadow: 5px 6px 0 rgba(119, 103, 184, .13); transform: translateY(-2px) rotate(-.1deg); }
-.entry-number { color: #c1b6e9; font-family: "Patrick Hand", cursive; font-size: 1rem; text-align: center; }
+.entry-number { color: #c1b6e9; font-family: "Patrick Hand", cursive; font-size: 1rem; padding-top: 8px; text-align: center; }
 .cover-art { aspect-ratio: 2 / 3; background: #e8eef5; border: 1px solid #c8d5e3; border-radius: 7px 8px 6px 9px; overflow: hidden; }
 .cover-art img { display: block; height: 100%; object-fit: cover; width: 100%; }
 .cover-placeholder { display: block; height: 100%; }
 .match-details { min-width: 0; }
 .source-note { color: var(--muted); font-family: "Patrick Hand", cursive; font-size: 1rem; line-height: 1; margin-bottom: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.select-wrap, .status-select { display: block; position: relative; }
-.select-wrap svg, .status-select svg { color: #8390a7; pointer-events: none; position: absolute; right: 9px; top: 50%; transform: translateY(-50%); }
-select { appearance: none; background: #fbfaf4; border: 1px solid #dcdde4; border-radius: 9px 11px 8px 10px; color: var(--ink); font-size: .92rem; font-weight: 700; min-height: 34px; outline: 0; overflow: hidden; padding: 0 30px 0 9px; text-overflow: ellipsis; width: 100%; }
 .entry-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
 .entry-meta span { background: #f1eeff; border-radius: 999px; color: var(--lilac-deep); font-family: "Patrick Hand", cursive; font-size: .9rem; line-height: 1; padding: 3px 7px; }
-.entry-actions { align-content: center; display: grid; gap: 7px; }
-.status-select select { background: #ecfbf5; border-color: #b5dfd2; color: #327060; font-size: .84rem; }
+.entry-actions { align-content: start; display: grid; gap: 7px; }
+
+.bubble-select { position: relative; width: 100%; }
+.bubble-select-trigger { align-items: center; background: #fbfaf4; border: 2px solid #dcdde4; border-radius: 11px 9px 12px 10px / 10px 12px 9px 11px; box-shadow: 2px 2px 0 rgba(119, 103, 184, .07); color: var(--ink); display: flex; font-size: .88rem; font-weight: 700; gap: 8px; justify-content: space-between; min-height: 36px; padding: 0 10px; text-align: left; transition: transform 120ms ease, box-shadow 120ms ease; width: 100%; }
+.bubble-select-trigger:hover { transform: translateY(-1px); }
+.bubble-select-value, .bubble-select-placeholder { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bubble-select-placeholder { color: #8b97ad; font-weight: 600; }
+.bubble-select-chevron { color: #8390a7; flex-shrink: 0; transition: transform 150ms ease; }
+.bubble-select-chevron.is-open { transform: rotate(180deg); }
+.bubble-select-menu { background: #fffefb; border: 2px solid #ded9e4; border-radius: 14px 11px 15px 12px / 12px 15px 11px 14px; box-shadow: 4px 6px 0 rgba(119, 103, 184, .12); left: 0; list-style: none; margin: 6px 0 0; max-height: 220px; overflow: auto; padding: 6px; position: absolute; right: 0; top: calc(100% - 2px); z-index: 20; }
+.bubble-select-option { align-items: center; background: transparent; border: 0; border-radius: 10px 8px 11px 9px; color: var(--ink); display: flex; font-size: .88rem; font-weight: 700; gap: 8px; justify-content: space-between; min-height: 34px; padding: 0 10px; text-align: left; transition: background-color 120ms ease; width: 100%; }
+.bubble-select-option:hover { background: #f4efff; }
+.bubble-select-option.is-selected { background: #ebe4ff; color: var(--lilac-deep); }
+.bubble-select-hint { color: var(--muted); font-family: "Patrick Hand", cursive; font-size: .95rem; font-weight: 400; }
+.bubble-select.mint .bubble-select-trigger { background: #ecfbf5; border-color: #b5dfd2; box-shadow: 2px 2px 0 rgba(63, 157, 136, .12); color: #327060; }
+.bubble-select.mint .bubble-select-option.is-selected { background: #dcf6eb; color: #2a705f; }
+.bubble-select.lilac .bubble-select-trigger { background: #f7f3ff; border-color: #d5c9f7; box-shadow: 2px 2px 0 rgba(119, 103, 184, .1); }
+.bubble-select.butter .bubble-select-trigger { background: #fff6d8; border-color: #ecd07a; box-shadow: 2px 2px 0 rgba(214, 168, 66, .14); color: #7a5a17; }
+.bubble-select.butter .bubble-select-option.is-selected { background: #fff0b8; color: #7a5a17; }
+
+.progress-field { display: grid; gap: 4px; }
+.progress-label { color: #327060; font-family: "Patrick Hand", cursive; font-size: .92rem; line-height: 1; }
+.progress-input-wrap { align-items: center; background: #ecfbf5; border: 2px solid #b5dfd2; border-radius: 11px 9px 12px 10px / 10px 12px 9px 11px; box-shadow: 2px 2px 0 rgba(63, 157, 136, .12); display: flex; gap: 4px; min-height: 36px; padding: 0 10px; }
+.progress-input { appearance: textfield; background: transparent; border: 0; color: #327060; font-family: "Baloo 2", ui-rounded, sans-serif; font-size: .92rem; font-weight: 800; min-width: 0; outline: 0; width: 100%; }
+.progress-input::-webkit-outer-spin-button, .progress-input::-webkit-inner-spin-button { appearance: none; margin: 0; }
+.progress-total { color: #5d9988; font-family: "Patrick Hand", cursive; font-size: .95rem; white-space: nowrap; }
+
 .result-badge { align-items: center; border-radius: 999px; display: inline-flex; font-family: "Patrick Hand", cursive; font-size: .95rem; gap: 4px; justify-self: start; line-height: 1; padding: 4px 8px; }
 .result-badge.good { background: #dff6e9; color: #2f7e5b; }
 .result-badge.bad { background: #ffe1e6; color: #b14868; }
@@ -148,6 +170,5 @@ select { appearance: none; background: #fbfaf4; border: 1px solid #dcdde4; borde
   .review-sheet { padding-top: 0; }
   .review-topline { align-items: stretch; flex-direction: column; }
   .match-card { align-items: start; grid-template-columns: 24px 48px minmax(0, 1fr); }
-  .entry-actions { grid-column: 2 / -1; grid-template-columns: minmax(0, 1fr) auto; }
-  .status-select { min-width: 0; }
+  .entry-actions { grid-column: 2 / -1; }
 }
