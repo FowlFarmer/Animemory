@@ -35,8 +35,8 @@ Copy `.env.example` to `.env`.
 OAuth callback URLs for local development:
 
 ```txt
-MyAnimeList: http://127.0.0.1:8787/auth/mal/callback
-AniList:     http://127.0.0.1:8787/auth/anilist/callback
+MyAnimeList: http://127.0.0.1:8787/api/auth/mal/callback
+AniList:     http://127.0.0.1:8787/api/auth/anilist/callback
 ```
 
 `GEMINI_API_KEY` is optional. Without it, the app uses deterministic parsing.

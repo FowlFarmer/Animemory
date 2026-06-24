@@ -12,14 +12,14 @@ export const config = {
     clientId: process.env.MAL_CLIENT_ID,
     clientSecret: process.env.MAL_CLIENT_SECRET,
     redirectUri:
-      process.env.MAL_REDIRECT_URI ?? "http://127.0.0.1:8787/auth/mal/callback"
+      process.env.MAL_REDIRECT_URI ?? "http://127.0.0.1:8787/api/auth/mal/callback"
   },
   anilist: {
     clientId: process.env.ANILIST_CLIENT_ID,
     clientSecret: process.env.ANILIST_CLIENT_SECRET,
     redirectUri:
       process.env.ANILIST_REDIRECT_URI ??
-      "http://127.0.0.1:8787/auth/anilist/callback"
+      "http://127.0.0.1:8787/api/auth/anilist/callback"
   },
   session: {
     redisUrl: process.env.UPSTASH_REDIS_REST_URL,

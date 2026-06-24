@@ -52,7 +52,7 @@ export function applySelections(
 }
 
 export async function disconnectProvider(provider: ProviderId): Promise<void> {
-  await request(`/auth/${provider}/logout`, {
+  await request(`/api/auth/${provider}/logout`, {
     method: "POST",
     body: JSON.stringify({})
   });

@@ -73,8 +73,8 @@ npm run build
 Create OAuth applications with these local redirect URIs:
 
 ```txt
-MyAnimeList: http://127.0.0.1:8787/auth/mal/callback
-AniList:     http://127.0.0.1:8787/auth/anilist/callback
+MyAnimeList: http://127.0.0.1:8787/api/auth/mal/callback
+AniList:     http://127.0.0.1:8787/api/auth/anilist/callback
 ```
 
 Fill in `.env`:
@@ -88,11 +88,11 @@ SESSION_ENCRYPTION_KEY=
 
 MAL_CLIENT_ID=
 MAL_CLIENT_SECRET=
-MAL_REDIRECT_URI=http://127.0.0.1:8787/auth/mal/callback
+MAL_REDIRECT_URI=http://127.0.0.1:8787/api/auth/mal/callback
 
 ANILIST_CLIENT_ID=
 ANILIST_CLIENT_SECRET=
-ANILIST_REDIRECT_URI=http://127.0.0.1:8787/auth/anilist/callback
+ANILIST_REDIRECT_URI=http://127.0.0.1:8787/api/auth/anilist/callback
 ```
 
 ## Deploying To Vercel
@@ -112,10 +112,10 @@ GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.1-flash-lite
 MAL_CLIENT_ID=
 MAL_CLIENT_SECRET=
-MAL_REDIRECT_URI=https://your-domain.vercel.app/auth/mal/callback
+MAL_REDIRECT_URI=https://your-domain.vercel.app/api/auth/mal/callback
 ANILIST_CLIENT_ID=
 ANILIST_CLIENT_SECRET=
-ANILIST_REDIRECT_URI=https://your-domain.vercel.app/auth/anilist/callback
+ANILIST_REDIRECT_URI=https://your-domain.vercel.app/api/auth/anilist/callback
 ```
 
 4. Register the two production callback URLs exactly as shown in the MAL and AniList application settings.
@@ -123,7 +123,7 @@ ANILIST_REDIRECT_URI=https://your-domain.vercel.app/auth/anilist/callback
 
 Use a stable production domain for OAuth callbacks. Preview deployment URLs are intentionally not suitable because they change.
 
-The public OAuth entrypoint is `https://your-domain.vercel.app/auth/mal/start`. Vercel rewrites `/auth/:path*` to the serverless API function while leaving the public URL unchanged.
+The public OAuth entrypoint is `https://your-domain.vercel.app/api/auth/mal/start`. OAuth functions use direct Vercel API paths so they do not depend on a rewrite rule.
 
 Generate the session encryption key once and add the result to Vercel's environment variables:
 

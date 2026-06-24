@@ -172,7 +172,7 @@ export function App() {
               Disconnect
             </button>
           ) : (
-            <a className="connect-button" href={`/auth/${provider}/start`}>
+            <a className="connect-button" href={`/api/auth/${provider}/start`}>
               <Link2 size={16} />
               Connect {activeProvider.label}
             </a>
