@@ -11,14 +11,14 @@ Animemory is a web app for turning a stray text list of anime into reviewed, bul
 - Lets the user review and override every match before anything is written.
 - Adds selected entries to the connected user's list.
 
-The parser uses OpenAI when `OPENAI_API_KEY` is configured. Without it, the app falls back to deterministic line parsing. In both modes, the app still searches the provider catalog and asks the user to review matches before writing anything.
+The parser uses Gemini 3.1 Flash Lite when `GEMINI_API_KEY` is configured. Without it, the app falls back to deterministic line parsing. In both modes, the app still searches the provider catalog and asks the user to review matches before writing anything.
 
 ## Stack
 
 - Vite + React for the browser app.
 - Express for the local API and OAuth callbacks.
 - Provider adapters for MyAnimeList and AniList.
-- Optional OpenAI Responses API call for messy text extraction.
+- Optional Gemini 3.1 Flash Lite call for messy text extraction.
 
 ## Project Layout
 
@@ -80,8 +80,8 @@ AniList:     http://127.0.0.1:8787/auth/anilist/callback
 Fill in `.env`:
 
 ```txt
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5-mini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.1-flash-lite
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 SESSION_ENCRYPTION_KEY=
@@ -108,8 +108,8 @@ APP_ORIGIN=https://your-domain.vercel.app
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
 SESSION_ENCRYPTION_KEY=
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5-mini
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.1-flash-lite
 MAL_CLIENT_ID=
 MAL_CLIENT_SECRET=
 MAL_REDIRECT_URI=https://your-domain.vercel.app/auth/mal/callback
@@ -181,4 +181,4 @@ The browser stores only an HTTP-only opaque session ID. Provider tokens and OAut
 - OAuth credentials are required before authenticated writes can be tested.
 - MAL tokens refresh automatically when a refresh token is available. Confirm AniList's refresh-token behavior before adding a corresponding flow.
 - Batch writes are sequential and do not yet include provider-aware retry or rate-limit backoff.
-- The fallback parser is intentionally simple; configure `OPENAI_API_KEY` for better extraction from highly irregular text.
+- The fallback parser is intentionally simple; configure `GEMINI_API_KEY` for better extraction from highly irregular text.

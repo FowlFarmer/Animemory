@@ -71,7 +71,7 @@ app.get("/api/auth/status", async (req, res, next) => {
         connected: Boolean(await tokenForProvider(req, provider as ProviderId))
       }))
     );
-    res.json({ providers: connected, llm: Boolean(config.openaiApiKey) });
+    res.json({ providers: connected, gemini: Boolean(config.gemini.apiKey) });
   } catch (error) {
     next(error);
   }

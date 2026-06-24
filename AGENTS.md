@@ -39,7 +39,7 @@ MyAnimeList: http://127.0.0.1:8787/auth/mal/callback
 AniList:     http://127.0.0.1:8787/auth/anilist/callback
 ```
 
-`OPENAI_API_KEY` is optional. Without it, the app uses deterministic parsing.
+`GEMINI_API_KEY` is optional. Without it, the app uses deterministic parsing.
 
 ## Implementation Guidelines
 
@@ -62,7 +62,7 @@ Use the LLM for extraction and disambiguation hints, not as the sole source of t
 4. Let the user review and override matches.
 5. Write only selected entries.
 
-When changing prompts, preserve the JSON contract expected by `server/services/parser.ts`.
+The Gemini parser uses structured JSON output. When changing its prompt or schema, preserve the JSON contract expected by `server/services/parser.ts`.
 
 ## Auth And Tokens
 

@@ -56,5 +56,5 @@ export type ApplyResult = {
 
 export type AuthStatus = {
   providers: Array<{ id: ProviderId; connected: boolean }>;
-  llm: boolean;
+  gemini: boolean;
 };

@@ -4,8 +4,10 @@ export const config = {
   appOrigin: process.env.APP_ORIGIN ?? "http://127.0.0.1:5173",
   port: Number(process.env.PORT ?? 8787),
   isProduction: process.env.NODE_ENV === "production",
-  openaiApiKey: process.env.OPENAI_API_KEY,
-  openaiModel: process.env.OPENAI_MODEL ?? "gpt-5-mini",
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY,
+    model: process.env.GEMINI_MODEL ?? "gemini-3.1-flash-lite"
+  },
   mal: {
     clientId: process.env.MAL_CLIENT_ID,
     clientSecret: process.env.MAL_CLIENT_SECRET,

@@ -27,9 +27,9 @@ export async function parseAnimeList(text: string): Promise<ParsedAnimeEntry[]> 
   const trimmed = text.trim();
   if (!trimmed) return [];
 
-  if (config.openaiApiKey) {
-    const llmParsed = await parseWithLlm(trimmed).catch(() => null);
-    if (llmParsed?.length) return llmParsed;
+  if (config.gemini.apiKey) {
+    const geminiParsed = await parseWithGemini(trimmed).catch(() => null);
+    if (geminiParsed?.length) return geminiParsed;
   }
 
   return parseDeterministically(trimmed);
@@ -52,36 +52,38 @@ function parseDeterministically(text: string): ParsedAnimeEntry[] {
     .filter((entry) => entry.title.length > 0);
 }
 
-async function parseWithLlm(text: string): Promise<ParsedAnimeEntry[]> {
-  const response = await fetch("https://api.openai.com/v1/responses", {
+async function parseWithGemini(text: string): Promise<ParsedAnimeEntry[]> {
+  const response = await fetch("https://generativelanguage.googleapis.com/v1beta/interactions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${config.openaiApiKey}`,
+      "x-goog-api-key": config.gemini.apiKey!,
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      model: config.openaiModel,
+      model: config.gemini.model,
       input: [
-        {
-          role: "system",
-          content:
-            "Extract anime list entries from messy text. Return only JSON: an array of objects with title, raw, optional year, status, score, progress, notes. Status must be one of current, planning, completed, paused, dropped, repeating. Scores are 0-10."
-        },
-        {
-          role: "user",
-          content: text
-        }
-      ]
+        "Extract anime list entries from the text below.",
+        "Return an array of objects. Preserve each original source line in raw.",
+        "Status must be current, planning, completed, paused, dropped, or repeating.",
+        "Scores are 0 through 10. Do not invent entries or fields.",
+        "Input:",
+        text
+      ].join("\n\n"),
+      response_format: {
+        type: "text",
+        mime_type: "application/json",
+        schema: animeEntryJsonSchema
+      }
     })
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI parse failed: ${response.status}`);
+    throw new Error(`Gemini parse failed: ${response.status}`);
   }
 
-  const json = (await response.json()) as { output_text?: string; output?: unknown };
-  const rawText = json.output_text ?? collectOutputText(json.output);
-  const parsed = parsedSchema.parse(JSON.parse(extractJson(rawText)));
+  const json = (await response.json()) as { output_text?: string; outputText?: string; output?: unknown };
+  const rawText = json.output_text ?? json.outputText ?? collectOutputText(json.output);
+  const parsed = parsedSchema.parse(JSON.parse(rawText));
 
   return parsed.map((entry, index) => ({
     id: `parsed-${index + 1}`,
@@ -103,13 +105,22 @@ function collectOutputText(output: unknown): string {
     .join("");
 }
 
-function extractJson(value: string): string {
-  const fenced = value.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-
-  const start = value.indexOf("[");
-  const end = value.lastIndexOf("]");
-  if (start >= 0 && end > start) return value.slice(start, end + 1);
-
-  return value;
-}
+const animeEntryJsonSchema = {
+  type: "array",
+  items: {
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      raw: { type: "string" },
+      year: { type: "integer", minimum: 1960, maximum: 2049 },
+      status: {
+        type: "string",
+        enum: ["current", "planning", "completed", "paused", "dropped", "repeating"]
+      },
+      score: { type: "number", minimum: 0, maximum: 10 },
+      progress: { type: "integer", minimum: 0 },
+      notes: { type: "string" }
+    },
+    required: ["title"]
+  }
+};
