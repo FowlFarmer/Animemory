@@ -291,6 +291,10 @@ export function App() {
     setRapidIndex(nextIndex);
   }
 
+  function skipRapidItem() {
+    advanceRapidMode(rapidIndex);
+  }
+
   async function maybeApplyRapid(match: MatchResult, candidateId?: number, score?: number) {
     if (rapidApplying || candidateId === undefined || score === undefined) return;
 
@@ -523,6 +527,7 @@ export function App() {
             setRapidScore(score);
             void maybeApplyRapid(matches[rapidIndex], rapidCandidateId, score);
           }}
+          onSkip={skipRapidItem}
         />
       ) : null}
     </main>
@@ -553,7 +558,8 @@ function RapidFireMode({
   score,
   onCandidate,
   onClose,
-  onScore
+  onScore,
+  onSkip
 }: {
   applying: boolean;
   candidateId?: number;
@@ -566,6 +572,7 @@ function RapidFireMode({
   onCandidate: (candidateId: number) => void;
   onClose: () => void;
   onScore: (score: number) => void;
+  onSkip: () => void;
 }) {
   const savedCount = matches.filter((item) => results[item.entry.id] === "Saved").length;
   const selectedCandidate = match?.candidates.find((candidate) => candidate.providerId === candidateId);
@@ -603,7 +610,7 @@ function RapidFireMode({
                   onClick={() => onCandidate(candidate.providerId)}
                   type="button"
                 >
-                  <span>{candidate.title}</span>
+                  <span>{candidate.matchedTitle}</span>
                   <small>{[
                     candidate.year,
                     candidate.episodes ? `${candidate.episodes} eps` : undefined,
@@ -628,8 +635,18 @@ function RapidFireMode({
             </div>
           </div>
 
-          <div className="rapid-status" role="status">
-            {applying ? "Saving..." : connected ? "Pick a match and a score." : "Connect your provider before saving."}
+          <div className="rapid-footer">
+            <button
+              className="rapid-skip"
+              disabled={applying}
+              onClick={onSkip}
+              type="button"
+            >
+              Skip
+            </button>
+            <div className="rapid-status" role="status">
+              {applying ? "Saving..." : connected ? "Pick a match and a score." : "Connect your provider before saving."}
+            </div>
           </div>
         </div>
       ) : (

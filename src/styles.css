@@ -185,7 +185,7 @@ h1 {
   align-items: start;
   display: grid;
   gap: 22px;
-  grid-template-columns: minmax(0, .82fr) minmax(0, 1.18fr);
+  grid-template-columns: minmax(260px, .65fr) minmax(0, 1.35fr);
 }
 
 .panel {
@@ -373,14 +373,17 @@ h2 {
 }
 
 .review-row {
-  align-items: center;
+  align-items: start;
   background: #fffdf7;
   border: 2px solid #e4dfeb;
   border-radius: 14px;
   display: grid;
   gap: 12px;
-  grid-template-columns: 34px 52px minmax(0, 1fr) minmax(236px, 300px) minmax(136px, 156px);
-  min-height: 116px;
+  grid-template-areas:
+    "number cover title state"
+    "number cover controls state";
+  grid-template-columns: 34px 52px minmax(0, 1fr) minmax(136px, 156px);
+  min-height: 138px;
   min-width: 0;
   padding: 12px;
 }
@@ -389,6 +392,7 @@ h2 {
   color: #b7abd9;
   font-family: "Patrick Hand", cursive;
   font-size: 1rem;
+  grid-area: number;
   text-align: center;
 }
 
@@ -397,6 +401,7 @@ h2 {
   background: linear-gradient(135deg, #f5edff, #dff7ef);
   border: 1px solid #d2d8e6;
   border-radius: 9px;
+  grid-area: cover;
   height: 78px;
   overflow: hidden;
   width: 52px;
@@ -412,6 +417,7 @@ h2 {
 .title-cell {
   display: grid;
   gap: 8px;
+  grid-area: title;
   min-width: 0;
 }
 
@@ -428,13 +434,16 @@ h2 {
 
 .source-title {
   color: var(--muted);
+  display: -webkit-box;
   font-family: "Patrick Hand", cursive;
   font-size: 1rem;
-  line-height: 1;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.08;
   margin-bottom: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .field {
@@ -472,6 +481,7 @@ select.field {
 .control-grid {
   display: grid;
   gap: 8px;
+  grid-area: controls;
   grid-template-columns: minmax(0, 1fr) 88px;
   min-width: 0;
 }
@@ -526,8 +536,10 @@ select.field {
 
 .row-state {
   align-items: center;
+  align-self: stretch;
   display: grid;
   gap: 7px;
+  grid-area: state;
   grid-template-columns: 36px minmax(0, 1fr);
   justify-items: end;
   min-width: 0;
@@ -666,9 +678,10 @@ select.field {
 }
 
 .rapid-entry h2 {
-  font-size: clamp(2.1rem, 5vw, 4.5rem);
-  line-height: .9;
+  font-size: clamp(1.8rem, 4.4vw, 4.1rem);
+  line-height: .98;
   max-width: 980px;
+  overflow-wrap: anywhere;
 }
 
 .rapid-cover {
@@ -730,6 +743,7 @@ select.field {
   font-size: 1.08rem;
   font-weight: 800;
   line-height: 1.1;
+  overflow-wrap: anywhere;
 }
 
 .rapid-candidate small {
@@ -767,10 +781,28 @@ select.field {
   border-color: #cfa63d;
 }
 
+.rapid-footer {
+  align-items: center;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: auto 1fr auto;
+}
+
+.rapid-skip {
+  background: #f2f1f0;
+  border: 2px solid #dad6d0;
+  border-radius: 999px;
+  color: #74717a;
+  font-weight: 800;
+  height: 42px;
+  padding: 0 22px;
+}
+
 .rapid-status {
   color: var(--muted);
   font-family: "Patrick Hand", cursive;
   font-size: 1.25rem;
+  grid-column: 2;
   min-height: 1.4em;
   text-align: center;
 }
@@ -873,8 +905,12 @@ select.field {
 
   .review-row {
     align-items: start;
+    grid-template-areas:
+      "number cover title"
+      "controls controls controls"
+      "state state state";
     grid-template-columns: 28px 48px minmax(0, 1fr);
-    min-height: 232px;
+    min-height: 254px;
   }
 
   .cover {
@@ -883,16 +919,16 @@ select.field {
   }
 
   .title-cell {
-    grid-column: 3;
+    grid-column: auto;
   }
 
   .control-grid {
-    grid-column: 1 / -1;
+    grid-column: auto;
     grid-template-columns: 1fr 108px;
   }
 
   .row-state {
-    grid-column: 1 / -1;
+    grid-column: auto;
     grid-template-columns: 36px 74px minmax(0, 1fr);
     justify-content: flex-start;
     justify-items: start;
@@ -938,6 +974,14 @@ select.field {
     border-radius: 14px;
     font-size: 1.5rem;
     min-height: 58px;
+  }
+
+  .rapid-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .rapid-status {
+    grid-column: auto;
   }
 }
 
