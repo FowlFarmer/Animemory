@@ -6,7 +6,8 @@ import {
   Loader2,
   LogOut,
   UploadCloud,
-  WandSparkles
+  WandSparkles,
+  X
 } from "lucide-react";
 import {
   applySelections,
@@ -15,7 +16,6 @@ import {
   matchAnimeEntries,
   parseAnimeText
 } from "./api";
-import { BubbleSelect } from "./components/BubbleSelect";
 import type {
   AuthStatus,
   MatchResult,
@@ -34,24 +34,29 @@ const STATUS_OPTIONS: Array<{ value: NormalizedStatus; label: string }> = [
   { value: "repeating", label: "Rewatching" }
 ];
 
-const SCORE_OPTIONS = Array.from({ length: 10 }, (_, index) => {
-  const score = index + 1;
-  return { value: score, label: `${score}/10` };
-});
-
-const PROVIDERS: Array<{ id: ProviderId; label: string; accent: string }> = [
-  { id: "mal", label: "MyAnimeList", accent: "blue" },
-  { id: "anilist", label: "AniList", accent: "violet" }
+const PROVIDERS: Array<{ id: ProviderId; label: string }> = [
+  { id: "mal", label: "MyAnimeList" },
+  { id: "anilist", label: "AniList" }
 ];
 
 const SAMPLE = `Frieren Beyond Journey's End - watching ep 12
 Cowboy Bebop completed 10/10
 Steins;Gate (2011) finished score 9
-Mob Psycho 100 III, done, 8.5/10
+Mob Psycho 100 III, done, 8/10
 Dungeon Meshi plan to watch`;
 
 function statusUsesProgress(status?: NormalizedStatus): boolean {
   return status !== undefined && status !== "planning";
+}
+
+function candidateOptionLabel(candidate: RankedCandidate): string {
+  return [
+    candidate.title,
+    candidate.year ? String(candidate.year) : undefined,
+    `${Math.round(candidate.matchScore * 100)}%`
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 export function App() {
@@ -67,12 +72,13 @@ export function App() {
   const [message, setMessage] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, string>>({});
 
+  const activeProvider = PROVIDERS.find((item) => item.id === provider)!;
   const connected = auth?.providers.find((item) => item.id === provider)?.connected ?? false;
   const selectedCount = useMemo(
-    () => Object.values(selectedIds).filter(Boolean).length,
+    () => Object.values(selectedIds).filter((value) => value !== undefined).length,
     [selectedIds]
   );
-  const activeProvider = PROVIDERS.find((item) => item.id === provider)!;
+  const lineCount = text.trim() ? text.trim().split(/\n+/).length : 0;
 
   useEffect(() => {
     void refreshAuth();
@@ -82,7 +88,7 @@ export function App() {
     try {
       setAuth(await getAuthStatus());
     } catch {
-      setMessage("The local API is not running yet.");
+      setMessage("Start the API server, then refresh this page.");
     }
   }
 
@@ -90,14 +96,11 @@ export function App() {
     setBusy("parse");
     setMessage(null);
     setResults({});
+
     try {
       const parsed = await parseAnimeText(text);
-      console.info(
-        `[animemory] parse parser=${parsed.parser}` +
-          (parsed.reason ? ` reason=${parsed.reason}` : "") +
-          ` entries=${parsed.entries.length}`
-      );
       const matched = await matchAnimeEntries(provider, parsed.entries);
+
       setMatches(matched.matches);
       setSelectedIds(
         Object.fromEntries(
@@ -110,18 +113,16 @@ export function App() {
         )
       );
       setScores(
-        Object.fromEntries(
-          matched.matches.map((match) => [match.entry.id, match.entry.score])
-        )
+        Object.fromEntries(matched.matches.map((match) => [match.entry.id, match.entry.score]))
       );
       setProgress(
         Object.fromEntries(
           matched.matches.map((match) => [match.entry.id, match.entry.progress])
         )
       );
-      setMessage(`${matched.matches.length} matches found.`);
+      setMessage(`${matched.matches.length} entries ready to review.`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "That list could not be matched yet.");
+      setMessage(error instanceof Error ? error.message : "That list could not be matched.");
     } finally {
       setBusy(null);
     }
@@ -130,10 +131,12 @@ export function App() {
   async function apply() {
     setBusy("apply");
     setMessage(null);
+
     try {
       const selections: SaveSelection[] = matches.flatMap((match) => {
         const providerAnimeId = selectedIds[match.entry.id];
-        if (!providerAnimeId) return [];
+        if (providerAnimeId === undefined) return [];
+
         const entryStatus = statuses[match.entry.id];
         return [{
           parsedId: match.entry.id,
@@ -154,7 +157,7 @@ export function App() {
           ])
         )
       );
-      setMessage(`${applied.results.length} entries added.`);
+      setMessage(`${applied.results.length} entries sent to ${activeProvider.label}.`);
       await refreshAuth();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Those entries could not be saved.");
@@ -183,87 +186,72 @@ export function App() {
   }
 
   return (
-    <main className="page-shell">
-      <header className="site-header">
-        <a className="wordmark" href="/" aria-label="Animemory home">
-          <span className="wordmark-spark">*</span>
-          animemory
-        </a>
-        <div className="provider-tabs" role="tablist" aria-label="Choose an anime provider">
+    <main className="app-shell">
+      <header className="topbar">
+        <a className="brand" href="/" aria-label="Animemory home">animemory</a>
+        <div className="provider-switch" aria-label="Choose an anime list provider">
           {PROVIDERS.map((item) => (
             <button
-              aria-selected={provider === item.id}
-              className={provider === item.id ? `active ${item.accent}` : item.accent}
+              aria-pressed={provider === item.id}
+              className="provider-button"
               key={item.id}
               onClick={() => setProvider(item.id)}
-              role="tab"
               type="button"
             >
               {item.label}
             </button>
           ))}
         </div>
-        <div className="account-action">
+        <div className="auth-action">
           {connected ? (
-            <button className="text-button" type="button" onClick={disconnect}>
-              <LogOut size={15} />
+            <button className="quiet-button" type="button" onClick={disconnect}>
+              <LogOut size={16} />
               Disconnect
             </button>
           ) : (
-            <a className="connect-button" href={`/api/auth/${provider}/start`}>
+            <a className="connect-link" href={`/api/auth/${provider}/start`}>
               <Link2 size={16} />
-              Connect {activeProvider.label}
+              Connect
             </a>
           )}
         </div>
       </header>
 
-      <section className="hero-band" aria-labelledby="page-title">
-        <div className="hero-copy">
-          <h1 id="page-title">Unformatted list -&gt; Clean My Anime List Entries</h1>
-          <div className="hero-status">
-            <span className={connected ? "status-dot is-connected" : "status-dot"} />
-            <span>{connected ? `${activeProvider.label} connected` : `Connect ${activeProvider.label} to add entries`}</span>
-          </div>
-        </div>
+      <section className="intro" aria-labelledby="page-title">
+        <h1 id="page-title">Unformatted list -&gt; Clean My Anime List Entries</h1>
+        <p>{connected ? `${activeProvider.label} is connected.` : `Connect ${activeProvider.label} before saving.`}</p>
       </section>
 
-      <section className="desk" aria-label="Anime import workspace">
-        <section className="paste-sheet" aria-labelledby="paste-heading">
-          <div className="section-topline">
-            <div>
-              <h2 id="paste-heading">Notes</h2>
-            </div>
-            <span className="paper-count">{text.trim() ? text.trim().split(/\n+/).length : 0}</span>
+      <section className="workspace" aria-label="Anime import workspace">
+        <section className="panel input-panel" aria-labelledby="paste-title">
+          <div className="panel-heading">
+            <h2 id="paste-title">Paste</h2>
+            <span>{lineCount} lines</span>
           </div>
-          <div className="paste-body">
-            <textarea
-              aria-label="Anime list text"
-              id="anime-list-text"
-              name="text"
-              onChange={(event) => setText(event.target.value)}
-              placeholder="One anime per line..."
-              spellCheck={false}
-              value={text}
-            />
-          </div>
-          <div className="sheet-footer">
-            <button
-              className="magic-button"
-              disabled={busy !== null || !text.trim()}
-              onClick={parseAndMatch}
-              type="button"
-            >
-              {busy === "parse" ? <Loader2 className="spin" size={18} /> : <WandSparkles size={18} />}
-              Match my list
-            </button>
-          </div>
+          <textarea
+            aria-label="Anime list text"
+            className="list-input"
+            onChange={(event) => setText(event.target.value)}
+            placeholder="Paste one messy anime list here..."
+            spellCheck={false}
+            value={text}
+          />
+          <button
+            className="primary-button"
+            disabled={busy !== null || !text.trim()}
+            onClick={parseAndMatch}
+            type="button"
+          >
+            {busy === "parse" ? <Loader2 className="spin" size={18} /> : <WandSparkles size={18} />}
+            Match list
+          </button>
         </section>
 
-        <section className="review-sheet" aria-labelledby="review-heading">
-          <div className="section-topline review-topline">
+        <section className="panel review-panel" aria-labelledby="review-title">
+          <div className="panel-heading review-heading">
             <div>
-              <h2 id="review-heading">Matches</h2>
+              <h2 id="review-title">Review</h2>
+              <span>{matches.length ? `${selectedCount}/${matches.length} selected` : "No matches yet"}</span>
             </div>
             <button
               className="save-button"
@@ -271,26 +259,24 @@ export function App() {
               onClick={apply}
               type="button"
             >
-              {busy === "apply" ? <Loader2 className="spin" size={17} /> : <UploadCloud size={17} />}
-              Add {selectedCount || ""} to my list
+              {busy === "apply" ? <Loader2 className="spin" size={18} /> : <UploadCloud size={18} />}
+              Add selected
             </button>
           </div>
 
           {message ? (
-            <div className="message-strip" role="status">
+            <div className="notice" role="status">
               <CircleAlert size={16} />
-              {message}
+              <span>{message}</span>
             </div>
           ) : null}
 
-          <div className="match-list">
+          <div className="review-list">
             {matches.length === 0 ? (
-              <div className="empty-review">
-                <p>No matches yet.</p>
-              </div>
+              <div className="empty-state">Paste a list, then match it.</div>
             ) : (
               matches.map((match, index) => (
-                <MatchCard
+                <ReviewRow
                   index={index + 1}
                   key={match.entry.id}
                   match={match}
@@ -305,11 +291,8 @@ export function App() {
                   onScore={(value) =>
                     setScores((current) => ({ ...current, [match.entry.id]: value }))
                   }
-                  onSelect={(candidate) =>
-                    setSelectedIds((current) => ({
-                      ...current,
-                      [match.entry.id]: candidate?.providerId
-                    }))
+                  onSelect={(providerAnimeId) =>
+                    setSelectedIds((current) => ({ ...current, [match.entry.id]: providerAnimeId }))
                   }
                   onStatus={(nextStatus) => updateStatus(match, nextStatus)}
                 />
@@ -319,37 +302,15 @@ export function App() {
         </section>
       </section>
 
-      <nav className="corner-links" aria-label="Site links">
-        <a className="corner-link corner-link-site" href="https://tzhu.dev" rel="noopener noreferrer" target="_blank">
-          tzhu.dev
-        </a>
-        <a
-          className="corner-link corner-link-kofi"
-          href="https://ko-fi.com/fowlfarmer"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          <KofiIcon />
-          Ko-fi
-        </a>
-      </nav>
+      <footer className="footer-links">
+        <a href="https://tzhu.dev" rel="noopener noreferrer" target="_blank">tzhu.dev</a>
+        <a href="https://ko-fi.com/fowlfarmer" rel="noopener noreferrer" target="_blank">Ko-fi</a>
+      </footer>
     </main>
   );
 }
 
-function KofiIcon() {
-  return (
-    <img
-      alt=""
-      className="corner-link-icon"
-      height={18}
-      src="https://storage.ko-fi.com/cdn/cup-border.png"
-      width={18}
-    />
-  );
-}
-
-function MatchCard({
+function ReviewRow({
   index,
   match,
   selectedId,
@@ -369,7 +330,7 @@ function MatchCard({
   score?: number;
   progress?: number;
   result?: string;
-  onSelect: (candidate?: RankedCandidate) => void;
+  onSelect: (providerAnimeId?: number) => void;
   onStatus: (status: NormalizedStatus) => void;
   onScore: (score?: number) => void;
   onProgress: (progress?: number) => void;
@@ -378,98 +339,90 @@ function MatchCard({
   const selected = match.candidates.find((candidate) => candidate.providerId === selectedId);
   const showProgress = statusUsesProgress(activeStatus);
   const episodeTotal = selected?.episodes ?? undefined;
-  const matchPercent = selected?.matchScore ?? match.confidence;
 
   return (
-    <article className="match-card">
-      <div className="entry-number">{String(index).padStart(2, "0")}</div>
-      <div className="cover-art">
-        {selected?.image ? <img src={selected.image} alt="" /> : <span className="cover-placeholder" />}
+    <article className="review-row">
+      <div className="row-number">{String(index).padStart(2, "0")}</div>
+      <div className="cover">
+        {selected?.image ? <img src={selected.image} alt="" /> : null}
       </div>
-      <div className="match-details">
-        <p className="source-note">{match.entry.raw}</p>
-        <BubbleSelect
-          allowEmpty
-          ariaLabel={`Match for ${match.entry.title}`}
-          emptyLabel="Keep this one aside"
-          onChange={(nextId) =>
-            onSelect(match.candidates.find((candidate) => candidate.providerId === nextId))
+
+      <div className="title-cell">
+        <p className="raw-title">{match.entry.raw}</p>
+        <select
+          aria-label={`Match for ${match.entry.title}`}
+          className="field match-field"
+          onChange={(event) =>
+            onSelect(event.target.value ? Number(event.target.value) : undefined)
           }
-          options={match.candidates.map((candidate) => ({
-            value: candidate.providerId,
-            label: candidate.matchedTitle,
-            hint: [
-              `${Math.round(candidate.matchScore * 100)}%`,
-              candidate.matchedLabel,
-              candidate.year ? String(candidate.year) : undefined
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          }))}
-          placeholder="Pick a match"
-          tone="lilac"
-          value={selectedId}
-        />
-        <div className="entry-meta">
-          <span>{Math.round(matchPercent * 100)}% match</span>
-          {selected ? <span>{selected.matchedLabel}</span> : null}
-          {episodeTotal ? <span>{episodeTotal} eps total</span> : null}
-        </div>
-      </div>
-      <div className="entry-actions">
-        <BubbleSelect
-          ariaLabel={`Status for ${match.entry.title}`}
-          onChange={(nextStatus) => onStatus(nextStatus!)}
-          options={STATUS_OPTIONS}
-          tone="mint"
-          value={activeStatus}
-        />
-        <BubbleSelect
-          allowEmpty
-          ariaLabel={`Score for ${match.entry.title}`}
-          emptyLabel="No score"
-          onChange={onScore}
-          options={SCORE_OPTIONS}
-          placeholder="Score"
-          tone="butter"
-          value={score}
-        />
-        <label className={`progress-field${showProgress ? "" : " is-disabled"}`}>
-          <span className="progress-label">Progress</span>
-          <div className="progress-input-wrap">
-            <input
-              aria-label={`Progress for ${match.entry.title}`}
-              className="progress-input"
-              disabled={!showProgress}
-              id={`progress-${match.entry.id}`}
-              inputMode="numeric"
-              max={episodeTotal ?? undefined}
-              min={0}
-              name={`progress-${match.entry.id}`}
-              onChange={(event) => {
-                const raw = event.target.value.trim();
-                onProgress(raw === "" ? undefined : Math.max(0, Number(raw)));
-              }}
-              placeholder="0"
-              type="number"
-              value={progress ?? ""}
-            />
-            {episodeTotal ? <span className="progress-total">/ {episodeTotal}</span> : null}
-          </div>
-        </label>
-        <span
-          aria-hidden={!result}
-          className={
-            result === "Saved"
-              ? "result-badge good"
-              : result
-                ? "result-badge bad"
-                : "result-badge result-badge-empty"
-          }
+          value={selectedId ?? ""}
         >
-          {result === "Saved" ? <CheckCircle2 size={15} /> : result ? <CircleAlert size={15} /> : null}
-          {result ?? "Saved"}
-        </span>
+          <option value="">Skip this entry</option>
+          {match.candidates.map((candidate) => (
+            <option key={candidate.providerId} value={candidate.providerId}>
+              {candidateOptionLabel(candidate)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="control-grid">
+        <select
+          aria-label={`Status for ${match.entry.title}`}
+          className="field"
+          onChange={(event) => onStatus(event.target.value as NormalizedStatus)}
+          value={activeStatus}
+        >
+          {STATUS_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>{option.label}</option>
+          ))}
+        </select>
+
+        <select
+          aria-label={`Score for ${match.entry.title}`}
+          className="field"
+          onChange={(event) =>
+            onScore(event.target.value ? Number(event.target.value) : undefined)
+          }
+          value={score ?? ""}
+        >
+          <option value="">No score</option>
+          {Array.from({ length: 10 }, (_, scoreIndex) => scoreIndex + 1).map((value) => (
+            <option key={value} value={value}>{value}/10</option>
+          ))}
+        </select>
+
+        <label className="progress-control">
+          <span>Ep</span>
+          <input
+            aria-label={`Progress for ${match.entry.title}`}
+            className="field progress-field"
+            disabled={!showProgress}
+            inputMode="numeric"
+            max={episodeTotal ?? undefined}
+            min={0}
+            onChange={(event) => {
+              const raw = event.target.value.trim();
+              onProgress(raw === "" ? undefined : Math.max(0, Number(raw)));
+            }}
+            placeholder="0"
+            type="number"
+            value={progress ?? ""}
+          />
+          {episodeTotal ? <span className="episode-total">/{episodeTotal}</span> : null}
+        </label>
+      </div>
+
+      <div className="row-state">
+        {result === "Saved" ? (
+          <span className="save-state good"><CheckCircle2 size={16} />Saved</span>
+        ) : result ? (
+          <span className="save-state bad"><CircleAlert size={16} />Failed</span>
+        ) : selectedId === undefined ? (
+          <span className="save-state muted"><X size={16} />Skipped</span>
+        ) : (
+          <span className="save-state ready">Ready</span>
+        )}
       </div>
     </article>
   );
