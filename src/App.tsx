@@ -5,6 +5,8 @@ import {
   Link2,
   Loader2,
   LogOut,
+  Play,
+  Send,
   UploadCloud,
   WandSparkles,
   X
@@ -13,6 +15,7 @@ import {
   applySelections,
   disconnectProvider,
   getAuthStatus,
+  getExistingListEntries,
   matchAnimeEntries,
   parseAnimeText
 } from "./api";
@@ -51,7 +54,7 @@ function statusUsesProgress(status?: NormalizedStatus): boolean {
 
 function candidateOptionLabel(candidate: RankedCandidate): string {
   return [
-    candidate.title,
+    candidate.matchedTitle,
     candidate.year ? String(candidate.year) : undefined,
     `${Math.round(candidate.matchScore * 100)}%`
   ]
@@ -69,8 +72,16 @@ export function App() {
   const [scores, setScores] = useState<Record<string, number | undefined>>({});
   const [progress, setProgress] = useState<Record<string, number | undefined>>({});
   const [busy, setBusy] = useState<"parse" | "apply" | null>(null);
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [results, setResults] = useState<Record<string, string>>({});
+  const [existingEntries, setExistingEntries] = useState<Record<number, boolean>>({});
+  const [overwriteExisting, setOverwriteExisting] = useState(false);
+  const [rapidOpen, setRapidOpen] = useState(false);
+  const [rapidIndex, setRapidIndex] = useState(0);
+  const [rapidCandidateId, setRapidCandidateId] = useState<number | undefined>();
+  const [rapidScore, setRapidScore] = useState<number | undefined>();
+  const [rapidApplying, setRapidApplying] = useState(false);
 
   const activeProvider = PROVIDERS.find((item) => item.id === provider)!;
   const connected = auth?.providers.find((item) => item.id === provider)?.connected ?? false;
@@ -100,8 +111,10 @@ export function App() {
     try {
       const parsed = await parseAnimeText(text);
       const matched = await matchAnimeEntries(provider, parsed.entries);
+      const existing = await listStatusForMatches(matched.matches);
 
       setMatches(matched.matches);
+      setExistingEntries(existing);
       setSelectedIds(
         Object.fromEntries(
           matched.matches.map((match) => [match.entry.id, match.selected?.providerId])
@@ -121,6 +134,10 @@ export function App() {
         )
       );
       setMessage(`${matched.matches.length} entries ready to review.`);
+      setRapidOpen(false);
+      setRapidIndex(0);
+      setRapidCandidateId(undefined);
+      setRapidScore(undefined);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "That list could not be matched.");
     } finally {
@@ -134,26 +151,16 @@ export function App() {
 
     try {
       const selections: SaveSelection[] = matches.flatMap((match) => {
-        const providerAnimeId = selectedIds[match.entry.id];
-        if (providerAnimeId === undefined) return [];
-
-        const entryStatus = statuses[match.entry.id];
-        return [{
-          parsedId: match.entry.id,
-          providerAnimeId,
-          status: entryStatus,
-          score: scores[match.entry.id],
-          progress: statusUsesProgress(entryStatus) ? progress[match.entry.id] : undefined,
-          notes: match.entry.notes
-        }];
+        const selection = selectionForMatch(match);
+        return selection ? [selection] : [];
       });
 
-      const applied = await applySelections(provider, selections);
+      const applied = await applySelections(provider, selections, overwriteExisting);
       setResults(
         Object.fromEntries(
           applied.results.map((result) => [
             result.parsedId,
-            result.ok ? "Saved" : result.error ?? "Could not save"
+            result.skipped ? "Skipped" : result.ok ? "Saved" : result.error ?? "Could not save"
           ])
         )
       );
@@ -163,6 +170,35 @@ export function App() {
       setMessage(error instanceof Error ? error.message : "Those entries could not be saved.");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function applyOne(match: MatchResult) {
+    const selection = selectionForMatch(match);
+    if (!selection) return;
+
+    setRowBusy(match.entry.id);
+    setMessage(null);
+
+    try {
+      const applied = await applySelections(provider, [selection], overwriteExisting);
+      const result = applied.results[0];
+      setResults((current) => ({
+        ...current,
+        [match.entry.id]: result?.skipped
+          ? "Skipped"
+          : result?.ok
+            ? "Saved"
+            : result?.error ?? "Could not save"
+      }));
+      await refreshAuth();
+    } catch (error) {
+      setResults((current) => ({
+        ...current,
+        [match.entry.id]: error instanceof Error ? error.message : "Could not save"
+      }));
+    } finally {
+      setRowBusy(null);
     }
   }
 
@@ -185,6 +221,120 @@ export function App() {
     }
   }
 
+  function setAllStatuses(nextStatus: NormalizedStatus) {
+    setStatuses(
+      Object.fromEntries(matches.map((match) => [match.entry.id, nextStatus]))
+    );
+
+    if (nextStatus === "completed") {
+      setProgress((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          matches.map((match) => {
+            const selected = match.candidates.find(
+              (candidate) => candidate.providerId === selectedIds[match.entry.id]
+            );
+            return [match.entry.id, selected?.episodes ?? current[match.entry.id]];
+          })
+        )
+      }));
+    }
+  }
+
+  function selectionForMatch(match: MatchResult): SaveSelection | undefined {
+    const providerAnimeId = selectedIds[match.entry.id];
+    if (providerAnimeId === undefined) return undefined;
+
+    const entryStatus = statuses[match.entry.id];
+    return {
+      parsedId: match.entry.id,
+      providerAnimeId,
+      status: entryStatus,
+      score: scores[match.entry.id],
+      progress: statusUsesProgress(entryStatus) ? progress[match.entry.id] : undefined,
+      notes: match.entry.notes
+    };
+  }
+
+  async function listStatusForMatches(matches: MatchResult[]): Promise<Record<number, boolean>> {
+    const providerAnimeIds = Array.from(
+      new Set(matches.flatMap((match) => match.candidates.map((candidate) => candidate.providerId)))
+    );
+    if (providerAnimeIds.length === 0) return {};
+
+    try {
+      const existing = await getExistingListEntries(provider, providerAnimeIds);
+      return Object.fromEntries(existing.entries.map((entry) => [entry.providerAnimeId, true]));
+    } catch {
+      return {};
+    }
+  }
+
+  function startRapidMode() {
+    setRapidIndex(firstPendingIndex(results, matches));
+    setRapidCandidateId(undefined);
+    setRapidScore(undefined);
+    setRapidOpen(true);
+  }
+
+  function closeRapidMode() {
+    setRapidOpen(false);
+    setRapidApplying(false);
+    setRapidCandidateId(undefined);
+    setRapidScore(undefined);
+  }
+
+  function advanceRapidMode(fromIndex: number) {
+    const nextIndex = nextPendingIndex(results, matches, fromIndex + 1);
+    setRapidCandidateId(undefined);
+    setRapidScore(undefined);
+    setRapidIndex(nextIndex);
+  }
+
+  async function maybeApplyRapid(match: MatchResult, candidateId?: number, score?: number) {
+    if (rapidApplying || candidateId === undefined || score === undefined) return;
+
+    const candidate = match.candidates.find((item) => item.providerId === candidateId);
+    if (!candidate) return;
+
+    setRapidApplying(true);
+    setSelectedIds((current) => ({ ...current, [match.entry.id]: candidateId }));
+    setStatuses((current) => ({ ...current, [match.entry.id]: "completed" }));
+    setScores((current) => ({ ...current, [match.entry.id]: score }));
+    setProgress((current) => ({ ...current, [match.entry.id]: candidate.episodes ?? undefined }));
+
+    try {
+      const applied = await applySelections(provider, [{
+        parsedId: match.entry.id,
+        providerAnimeId: candidateId,
+        status: "completed",
+        score,
+        progress: candidate.episodes ?? undefined,
+        notes: match.entry.notes
+      }], overwriteExisting);
+      const result = applied.results[0];
+      setResults((current) => ({
+        ...current,
+        [match.entry.id]: result?.skipped
+          ? "Skipped"
+          : result?.ok
+            ? "Saved"
+            : result?.error ?? "Could not save"
+      }));
+
+      if (result?.ok) {
+        advanceRapidMode(rapidIndex);
+      }
+    } catch (error) {
+      setResults((current) => ({
+        ...current,
+        [match.entry.id]: error instanceof Error ? error.message : "Could not save"
+      }));
+    } finally {
+      setRapidApplying(false);
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="topbar">
@@ -195,7 +345,12 @@ export function App() {
               aria-pressed={provider === item.id}
               className="provider-button"
               key={item.id}
-              onClick={() => setProvider(item.id)}
+              onClick={() => {
+                setProvider(item.id);
+                setMatches([]);
+                setResults({});
+                setExistingEntries({});
+              }}
               type="button"
             >
               {item.label}
@@ -253,15 +408,51 @@ export function App() {
               <h2 id="review-title">Review</h2>
               <span>{matches.length ? `${selectedCount}/${matches.length} selected` : "No matches yet"}</span>
             </div>
-            <button
-              className="save-button"
-              disabled={busy !== null || !connected || selectedCount === 0}
-              onClick={apply}
-              type="button"
-            >
-              {busy === "apply" ? <Loader2 className="spin" size={18} /> : <UploadCloud size={18} />}
-              Add selected
-            </button>
+            <div className="review-actions">
+              <select
+                aria-label="Set all statuses"
+                className="field bulk-status-field"
+                disabled={matches.length === 0}
+                onChange={(event) => {
+                  if (!event.target.value) return;
+                  setAllStatuses(event.target.value as NormalizedStatus);
+                  event.target.value = "";
+                }}
+                value=""
+              >
+                <option value="">Set all...</option>
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+              <label className="override-toggle">
+                <input
+                  checked={overwriteExisting}
+                  onChange={(event) => setOverwriteExisting(event.target.checked)}
+                  type="checkbox"
+                />
+                <span />
+                Update existing
+              </label>
+              <button
+                className="rapid-button"
+                disabled={busy !== null || matches.length === 0}
+                onClick={startRapidMode}
+                type="button"
+              >
+                <Play size={17} />
+                Rapid fire
+              </button>
+              <button
+                className="save-button"
+                disabled={busy !== null || !connected || selectedCount === 0}
+                onClick={apply}
+                type="button"
+              >
+                {busy === "apply" ? <Loader2 className="spin" size={18} /> : <UploadCloud size={18} />}
+                Add selected
+              </button>
+            </div>
           </div>
 
           {message ? (
@@ -282,9 +473,15 @@ export function App() {
                   match={match}
                   progress={progress[match.entry.id]}
                   result={results[match.entry.id]}
+                  rowBusy={rowBusy === match.entry.id}
                   score={scores[match.entry.id]}
                   selectedId={selectedIds[match.entry.id]}
                   status={statuses[match.entry.id]}
+                  existing={Boolean(
+                    selectedIds[match.entry.id] !== undefined &&
+                      existingEntries[selectedIds[match.entry.id]!]
+                  )}
+                  onApply={() => void applyOne(match)}
                   onProgress={(value) =>
                     setProgress((current) => ({ ...current, [match.entry.id]: value }))
                   }
@@ -306,7 +503,143 @@ export function App() {
         <a href="https://tzhu.dev" rel="noopener noreferrer" target="_blank">tzhu.dev</a>
         <a href="https://ko-fi.com/fowlfarmer" rel="noopener noreferrer" target="_blank">Ko-fi</a>
       </footer>
+
+      {rapidOpen ? (
+        <RapidFireMode
+          applying={rapidApplying}
+          candidateId={rapidCandidateId}
+          connected={connected}
+          index={rapidIndex}
+          match={matches[rapidIndex]}
+          matches={matches}
+          results={results}
+          score={rapidScore}
+          onCandidate={(candidateId) => {
+            setRapidCandidateId(candidateId);
+            void maybeApplyRapid(matches[rapidIndex], candidateId, rapidScore);
+          }}
+          onClose={closeRapidMode}
+          onScore={(score) => {
+            setRapidScore(score);
+            void maybeApplyRapid(matches[rapidIndex], rapidCandidateId, score);
+          }}
+        />
+      ) : null}
     </main>
+  );
+}
+
+function firstPendingIndex(results: Record<string, string>, matches: MatchResult[]): number {
+  return nextPendingIndex(results, matches, 0);
+}
+
+function nextPendingIndex(
+  results: Record<string, string>,
+  matches: MatchResult[],
+  startIndex: number
+): number {
+  const next = matches.findIndex((match, index) => index >= startIndex && results[match.entry.id] !== "Saved");
+  return next === -1 ? matches.length : next;
+}
+
+function RapidFireMode({
+  applying,
+  candidateId,
+  connected,
+  index,
+  match,
+  matches,
+  results,
+  score,
+  onCandidate,
+  onClose,
+  onScore
+}: {
+  applying: boolean;
+  candidateId?: number;
+  connected: boolean;
+  index: number;
+  match?: MatchResult;
+  matches: MatchResult[];
+  results: Record<string, string>;
+  score?: number;
+  onCandidate: (candidateId: number) => void;
+  onClose: () => void;
+  onScore: (score: number) => void;
+}) {
+  const savedCount = matches.filter((item) => results[item.entry.id] === "Saved").length;
+  const selectedCandidate = match?.candidates.find((candidate) => candidate.providerId === candidateId);
+
+  return (
+    <section className="rapid-overlay" aria-label="Rapid fire mode">
+      <button className="rapid-close" type="button" onClick={onClose} aria-label="Close rapid fire mode">
+        <X size={24} />
+      </button>
+
+      {match ? (
+        <div className="rapid-stage">
+          <div className="rapid-topline">
+            <span>{index + 1} / {matches.length}</span>
+            <span>{savedCount} saved</span>
+          </div>
+
+          <div className="rapid-entry">
+            <div className="rapid-cover">
+              {selectedCandidate?.image ? <img src={selectedCandidate.image} alt="" /> : null}
+            </div>
+            <div>
+              <p>Now rating</p>
+              <h2>{match.entry.raw}</h2>
+            </div>
+          </div>
+
+          <div className="rapid-grid">
+            <div className="rapid-match-panel" aria-label="Choose the matching anime">
+              {match.candidates.map((candidate) => (
+                <button
+                  className={candidate.providerId === candidateId ? "rapid-candidate is-selected" : "rapid-candidate"}
+                  disabled={applying || !connected}
+                  key={candidate.providerId}
+                  onClick={() => onCandidate(candidate.providerId)}
+                  type="button"
+                >
+                  <span>{candidate.title}</span>
+                  <small>{[
+                    candidate.year,
+                    candidate.episodes ? `${candidate.episodes} eps` : undefined,
+                    `${Math.round(candidate.matchScore * 100)}%`
+                  ].filter(Boolean).join(" · ")}</small>
+                </button>
+              ))}
+            </div>
+
+            <div className="rapid-score-panel" aria-label="Choose completed rating">
+              {Array.from({ length: 10 }, (_, scoreIndex) => scoreIndex + 1).map((value) => (
+                <button
+                  className={value === score ? "rapid-score is-selected" : "rapid-score"}
+                  disabled={applying || !connected}
+                  key={value}
+                  onClick={() => onScore(value)}
+                  type="button"
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rapid-status" role="status">
+            {applying ? "Saving..." : connected ? "Pick a match and a score." : "Connect your provider before saving."}
+          </div>
+        </div>
+      ) : (
+        <div className="rapid-done">
+          <h2>All done.</h2>
+          <p>{savedCount} entries saved.</p>
+          <button className="primary-button" type="button" onClick={onClose}>Back to review</button>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -318,6 +651,9 @@ function ReviewRow({
   score,
   progress,
   result,
+  rowBusy,
+  existing,
+  onApply,
   onSelect,
   onStatus,
   onScore,
@@ -330,6 +666,9 @@ function ReviewRow({
   score?: number;
   progress?: number;
   result?: string;
+  rowBusy: boolean;
+  existing: boolean;
+  onApply: () => void;
   onSelect: (providerAnimeId?: number) => void;
   onStatus: (status: NormalizedStatus) => void;
   onScore: (score?: number) => void;
@@ -348,7 +687,7 @@ function ReviewRow({
       </div>
 
       <div className="title-cell">
-        <p className="raw-title">{match.entry.raw}</p>
+        <p className="source-title">{match.entry.raw}</p>
         <select
           aria-label={`Match for ${match.entry.title}`}
           className="field match-field"
@@ -414,16 +753,36 @@ function ReviewRow({
       </div>
 
       <div className="row-state">
-        {result === "Saved" ? (
-          <span className="save-state good"><CheckCircle2 size={16} />Saved</span>
-        ) : result ? (
-          <span className="save-state bad"><CircleAlert size={16} />Failed</span>
-        ) : selectedId === undefined ? (
-          <span className="save-state muted"><X size={16} />Skipped</span>
-        ) : (
-          <span className="save-state ready">Ready</span>
-        )}
+        {existing && result !== "Saved" && result !== "Skipped" ? (
+          <span className="existing-pill">On list</span>
+        ) : null}
+        <button
+          aria-label={`Save ${match.entry.title}`}
+          className="row-send-button"
+          disabled={rowBusy || selectedId === undefined}
+          onClick={onApply}
+          type="button"
+        >
+          {rowBusy ? <Loader2 className="spin" size={16} /> : <Send size={16} />}
+        </button>
+        <ResultBadge result={result} selectedId={selectedId} />
       </div>
     </article>
   );
+}
+
+function ResultBadge({ result, selectedId }: { result?: string; selectedId?: number }) {
+  if (result === "Saved") {
+    return <span className="save-state good"><CheckCircle2 size={16} />Saved</span>;
+  }
+  if (result === "Skipped") {
+    return <span className="save-state muted"><X size={16} />Exists</span>;
+  }
+  if (result) {
+    return <span className="save-state bad"><CircleAlert size={16} />Failed</span>;
+  }
+  if (selectedId === undefined) {
+    return <span className="save-state muted"><X size={16} />Skip</span>;
+  }
+  return <span className="save-state ready">Ready</span>;
 }

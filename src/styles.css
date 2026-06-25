@@ -125,6 +125,7 @@ input:focus-visible {
 .connect-link,
 .quiet-button,
 .primary-button,
+.rapid-button,
 .save-button {
   align-items: center;
   border: 2px solid transparent;
@@ -261,6 +262,76 @@ h2 {
   gap: 4px;
 }
 
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.bulk-status-field {
+  min-width: 150px;
+  width: auto;
+}
+
+.override-toggle {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-family: "Patrick Hand", cursive;
+  font-size: 1.05rem;
+  gap: 8px;
+  height: 42px;
+  white-space: nowrap;
+}
+
+.override-toggle input {
+  height: 1px;
+  margin: -1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.override-toggle span {
+  background: #ece8e1;
+  border: 2px solid #d5d0c8;
+  border-radius: 999px;
+  display: inline-block;
+  height: 24px;
+  position: relative;
+  width: 44px;
+}
+
+.override-toggle span::after {
+  background: var(--paper);
+  border-radius: 50%;
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, .12);
+  content: "";
+  height: 16px;
+  left: 3px;
+  position: absolute;
+  top: 2px;
+  transition: transform 140ms ease;
+  width: 16px;
+}
+
+.override-toggle input:checked + span {
+  background: var(--mint);
+  border-color: #80cdb8;
+}
+
+.override-toggle input:checked + span::after {
+  transform: translateX(19px);
+}
+
+.rapid-button {
+  background: var(--butter);
+  border-color: #e6c368;
+  color: #684e12;
+  padding: 0 16px;
+}
+
 .save-button {
   background: var(--mint);
   border-color: #80cdb8;
@@ -308,7 +379,7 @@ h2 {
   border-radius: 14px;
   display: grid;
   gap: 12px;
-  grid-template-columns: 34px 52px minmax(0, 1fr) minmax(236px, 300px) 70px;
+  grid-template-columns: 34px 52px minmax(0, 1fr) minmax(236px, 300px) minmax(136px, 156px);
   min-height: 116px;
   min-width: 0;
   padding: 12px;
@@ -346,11 +417,21 @@ h2 {
 
 .raw-title {
   color: var(--ink);
-  font-family: "Patrick Hand", cursive;
-  font-size: 1.14rem;
-  line-height: 1.12;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
   margin-bottom: 0;
-  min-height: 1.2em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-title {
+  color: var(--muted);
+  font-family: "Patrick Hand", cursive;
+  font-size: 1rem;
+  line-height: 1;
+  margin-bottom: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -445,9 +526,35 @@ select.field {
 
 .row-state {
   align-items: center;
-  display: flex;
-  justify-content: flex-end;
+  display: grid;
+  gap: 7px;
+  grid-template-columns: 36px minmax(0, 1fr);
+  justify-items: end;
   min-width: 0;
+}
+
+.existing-pill {
+  background: #fff3cf;
+  border-radius: 999px;
+  color: #80631a;
+  font-family: "Patrick Hand", cursive;
+  font-size: .94rem;
+  grid-column: 1 / -1;
+  justify-self: end;
+  line-height: 1;
+  padding: 5px 8px;
+}
+
+.row-send-button {
+  align-items: center;
+  background: var(--sky);
+  border: 2px solid #8fc4ef;
+  border-radius: 12px;
+  color: #315276;
+  display: inline-flex;
+  height: 34px;
+  justify-content: center;
+  width: 36px;
 }
 
 .save-state {
@@ -459,7 +566,7 @@ select.field {
   gap: 5px;
   height: 30px;
   justify-content: center;
-  min-width: 70px;
+  min-width: 66px;
   padding: 0 9px;
   white-space: nowrap;
 }
@@ -495,6 +602,197 @@ select.field {
   font-family: "Patrick Hand", cursive;
   font-size: 1rem;
   text-decoration: none;
+}
+
+.rapid-overlay {
+  background:
+    radial-gradient(circle at 15% 15%, rgba(255, 169, 198, .24), transparent 34%),
+    radial-gradient(circle at 88% 15%, rgba(183, 221, 255, .34), transparent 32%),
+    linear-gradient(135deg, #fff8eb, #fffefb 48%, #f6f1ff);
+  color: var(--ink);
+  display: grid;
+  inset: 0;
+  overflow-y: auto;
+  padding: clamp(18px, 4vw, 48px);
+  place-items: center;
+  position: fixed;
+  z-index: 100;
+}
+
+.rapid-close {
+  align-items: center;
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  display: inline-flex;
+  height: 46px;
+  justify-content: center;
+  position: fixed;
+  right: clamp(16px, 3vw, 32px);
+  top: clamp(16px, 3vw, 32px);
+  width: 46px;
+  z-index: 2;
+}
+
+.rapid-stage {
+  display: grid;
+  gap: 22px;
+  max-width: 1180px;
+  width: min(100%, 1180px);
+}
+
+.rapid-topline {
+  color: var(--muted);
+  display: flex;
+  font-family: "Patrick Hand", cursive;
+  font-size: 1.2rem;
+  justify-content: space-between;
+  padding-right: 60px;
+}
+
+.rapid-entry {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 96px minmax(0, 1fr);
+}
+
+.rapid-entry p {
+  color: var(--muted);
+  font-family: "Patrick Hand", cursive;
+  font-size: 1.2rem;
+  margin-bottom: 5px;
+}
+
+.rapid-entry h2 {
+  font-size: clamp(2.1rem, 5vw, 4.5rem);
+  line-height: .9;
+  max-width: 980px;
+}
+
+.rapid-cover {
+  aspect-ratio: 2 / 3;
+  background: linear-gradient(135deg, #f5edff, #dff7ef);
+  border: 2px solid #d2d8e6;
+  border-radius: 18px;
+  box-shadow: 4px 5px 0 var(--shadow);
+  overflow: hidden;
+  width: 96px;
+}
+
+.rapid-cover img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.rapid-grid {
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  min-height: 440px;
+}
+
+.rapid-match-panel,
+.rapid-score-panel,
+.rapid-done {
+  background: var(--paper);
+  border: 2px solid var(--line);
+  border-radius: 22px;
+  box-shadow: 5px 7px 0 var(--shadow);
+}
+
+.rapid-match-panel {
+  align-content: start;
+  display: grid;
+  gap: 12px;
+  max-height: min(56vh, 560px);
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.rapid-candidate {
+  align-items: start;
+  background: #f8f4ff;
+  border: 2px solid #d6cbf8;
+  border-radius: 16px;
+  color: var(--ink);
+  display: grid;
+  gap: 5px;
+  min-height: 74px;
+  padding: 13px 15px;
+  text-align: left;
+}
+
+.rapid-candidate span {
+  font-size: 1.08rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.rapid-candidate small {
+  color: #7767b8;
+  font-family: "Patrick Hand", cursive;
+  font-size: 1.02rem;
+  line-height: 1;
+}
+
+.rapid-candidate.is-selected {
+  background: #ebe4ff;
+  border-color: #9e8fdd;
+}
+
+.rapid-score-panel {
+  align-content: stretch;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 16px;
+}
+
+.rapid-score {
+  background: #fff3cf;
+  border: 2px solid #efd991;
+  border-radius: 18px;
+  color: #684e12;
+  font-size: clamp(1.8rem, 4vw, 3rem);
+  font-weight: 800;
+  min-height: 68px;
+}
+
+.rapid-score.is-selected {
+  background: var(--butter);
+  border-color: #cfa63d;
+}
+
+.rapid-status {
+  color: var(--muted);
+  font-family: "Patrick Hand", cursive;
+  font-size: 1.25rem;
+  min-height: 1.4em;
+  text-align: center;
+}
+
+.rapid-done {
+  display: grid;
+  gap: 14px;
+  justify-items: center;
+  max-width: 420px;
+  padding: 36px;
+  text-align: center;
+}
+
+.rapid-done h2 {
+  font-size: clamp(2.5rem, 8vw, 4.5rem);
+}
+
+.rapid-done p {
+  color: var(--muted);
+  font-family: "Patrick Hand", cursive;
+  font-size: 1.25rem;
+  margin-bottom: 4px;
 }
 
 .spin {
@@ -559,9 +857,18 @@ select.field {
   }
 
   .primary-button,
+  .rapid-button,
   .save-button {
     justify-self: stretch;
     width: 100%;
+  }
+
+  .review-actions {
+    width: 100%;
+  }
+
+  .review-actions > button {
+    flex: 1 1 170px;
   }
 
   .review-row {
@@ -586,7 +893,51 @@ select.field {
 
   .row-state {
     grid-column: 1 / -1;
+    grid-template-columns: 36px 74px minmax(0, 1fr);
     justify-content: flex-start;
+    justify-items: start;
+  }
+
+  .existing-pill {
+    grid-column: auto;
+    order: 3;
+  }
+
+  .rapid-overlay {
+    align-items: start;
+    padding: 18px 14px 32px;
+  }
+
+  .rapid-topline {
+    padding-right: 54px;
+  }
+
+  .rapid-entry {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .rapid-cover {
+    border-radius: 14px;
+    width: 64px;
+  }
+
+  .rapid-grid {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .rapid-match-panel {
+    max-height: 42vh;
+  }
+
+  .rapid-score-panel {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .rapid-score {
+    border-radius: 14px;
+    font-size: 1.5rem;
+    min-height: 58px;
   }
 }
 

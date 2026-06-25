@@ -70,9 +70,17 @@ export type SaveSelection = {
   notes?: string;
 };
 
+export type ExistingListEntry = {
+  providerAnimeId: number;
+  status?: NormalizedStatus;
+  score?: number;
+  progress?: number;
+};
+
 export type ApplyResult = {
   parsedId: string;
   ok: boolean;
+  skipped?: boolean;
   error?: string;
 };
 

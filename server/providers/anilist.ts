@@ -1,7 +1,7 @@
 import { readJson } from "../lib/http.js";
-import type { AnimeCandidate, Provider, SaveSelection } from "../types.js";
+import type { AnimeCandidate, ExistingListEntry, Provider, SaveSelection } from "../types.js";
 import { titleVariant, uniqueTitleVariants } from "../lib/titles.js";
-import { toAniListStatus } from "./status.js";
+import { fromAniListStatus, toAniListStatus } from "./status.js";
 
 type AniListGraphqlResponse<T> = {
   data?: T;
@@ -19,6 +19,23 @@ type AniListSearchData = {
       episodes?: number | null;
       coverImage?: { large?: string | null };
       siteUrl?: string | null;
+    }>;
+  };
+};
+
+type AniListViewerData = {
+  Viewer: { id: number };
+};
+
+type AniListMediaListData = {
+  MediaListCollection: {
+    lists: Array<{
+      entries: Array<{
+        mediaId: number;
+        status?: string | null;
+        progress?: number | null;
+        score?: number | null;
+      }>;
     }>;
   };
 };
@@ -73,6 +90,43 @@ export const anilistProvider: Provider = {
         siteUrl: media.siteUrl ?? null
       } satisfies AnimeCandidate;
     });
+  },
+  async getAnimeListEntries(providerAnimeIds: number[], token: string): Promise<ExistingListEntry[]> {
+    const wanted = new Set(providerAnimeIds);
+    if (wanted.size === 0) return [];
+
+    const viewer = await anilistRequest<AniListViewerData>(
+      "query ViewerId { Viewer { id } }",
+      {},
+      token
+    );
+
+    const data = await anilistRequest<AniListMediaListData>(
+      `query ExistingAnimeList($userId: Int) {
+        MediaListCollection(type: ANIME, userId: $userId) {
+          lists {
+            entries {
+              mediaId
+              status
+              progress
+              score
+            }
+          }
+        }
+      }`,
+      { userId: viewer.Viewer.id },
+      token
+    );
+
+    return data.MediaListCollection.lists
+      .flatMap((list) => list.entries)
+      .filter((entry) => wanted.has(entry.mediaId))
+      .map((entry) => ({
+        providerAnimeId: entry.mediaId,
+        status: fromAniListStatus(entry.status ?? undefined),
+        progress: entry.progress ?? undefined,
+        score: entry.score ?? undefined
+      }));
   },
   async saveAnimeEntry(selection: SaveSelection, token: string): Promise<unknown> {
     return anilistRequest(

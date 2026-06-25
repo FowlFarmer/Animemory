@@ -70,9 +70,17 @@ export type SaveSelection = {
   notes?: string;
 };
 
+export type ExistingListEntry = {
+  providerAnimeId: number;
+  status?: NormalizedStatus;
+  score?: number;
+  progress?: number;
+};
+
 export type Provider = {
   id: ProviderId;
   label: string;
   searchAnime(query: string, token?: string): Promise<AnimeCandidate[]>;
+  getAnimeListEntries?(providerAnimeIds: number[], token: string): Promise<ExistingListEntry[]>;
   saveAnimeEntry(selection: SaveSelection, token: string): Promise<unknown>;
 };

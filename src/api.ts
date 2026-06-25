@@ -1,6 +1,7 @@
 import type {
   ApplyResult,
   AuthStatus,
+  ExistingListEntry,
   MatchResult,
   ParsedAnimeEntry,
   ProviderId,
@@ -55,11 +56,22 @@ export function matchAnimeEntries(
 
 export function applySelections(
   provider: ProviderId,
-  selections: SaveSelection[]
+  selections: SaveSelection[],
+  overwriteExisting = false
 ): Promise<{ results: ApplyResult[] }> {
   return request("/api/apply", {
     method: "POST",
-    body: JSON.stringify({ provider, selections })
+    body: JSON.stringify({ provider, selections, overwriteExisting })
+  });
+}
+
+export function getExistingListEntries(
+  provider: ProviderId,
+  providerAnimeIds: number[]
+): Promise<{ entries: ExistingListEntry[] }> {
+  return request("/api/list-status", {
+    method: "POST",
+    body: JSON.stringify({ provider, providerAnimeIds })
   });
 }
 

@@ -37,8 +37,14 @@ const matchRequestSchema = z.object({
   )
 });
 
+const listStatusRequestSchema = z.object({
+  provider: providerSchema,
+  providerAnimeIds: z.array(z.number())
+});
+
 const applyRequestSchema = z.object({
   provider: providerSchema,
+  overwriteExisting: z.boolean().optional().default(false),
   selections: z.array(
     z.object({
       parsedId: z.string(),
@@ -99,6 +105,25 @@ app.post("/api/match", async (req, res, next) => {
   }
 });
 
+app.post("/api/list-status", async (req, res, next) => {
+  try {
+    const body = listStatusRequestSchema.parse(req.body);
+    const token = await tokenForProvider(req, res, body.provider);
+    if (!token) {
+      res.json({ entries: [] });
+      return;
+    }
+
+    const provider = getProvider(body.provider);
+    const entries = provider.getAnimeListEntries
+      ? await provider.getAnimeListEntries(body.providerAnimeIds, token)
+      : [];
+    res.json({ entries });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/api/apply", async (req, res, next) => {
   try {
     const body = applyRequestSchema.parse(req.body);
@@ -110,9 +135,24 @@ app.post("/api/apply", async (req, res, next) => {
 
     const provider = getProvider(body.provider);
     const results = [];
+    const existing = body.overwriteExisting || !provider.getAnimeListEntries
+      ? new Map<number, boolean>()
+      : new Map(
+          (
+            await provider.getAnimeListEntries(
+              body.selections.map((selection) => selection.providerAnimeId),
+              token
+            )
+          ).map((entry) => [entry.providerAnimeId, true])
+        );
 
     for (const selection of body.selections) {
       try {
+        if (existing.has(selection.providerAnimeId)) {
+          results.push({ parsedId: selection.parsedId, ok: true, skipped: true });
+          continue;
+        }
+
         const saved = await provider.saveAnimeEntry(selection, token);
         results.push({ parsedId: selection.parsedId, ok: true, saved });
       } catch (error) {

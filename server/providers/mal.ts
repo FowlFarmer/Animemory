@@ -1,8 +1,8 @@
 import { config } from "../config.js";
 import { readJson } from "../lib/http.js";
-import type { AnimeCandidate, Provider, SaveSelection } from "../types.js";
+import type { AnimeCandidate, ExistingListEntry, Provider, SaveSelection } from "../types.js";
 import { titleVariant, uniqueTitleVariants } from "../lib/titles.js";
-import { toMalStatus } from "./status.js";
+import { fromMalStatus, toMalStatus } from "./status.js";
 
 type MalSearchResponse = {
   data: Array<{
@@ -15,6 +15,18 @@ type MalSearchResponse = {
       num_episodes?: number;
     };
   }>;
+};
+
+type MalAnimeListResponse = {
+  data: Array<{
+    node: { id: number };
+    list_status?: {
+      status?: string;
+      score?: number;
+      num_episodes_watched?: number;
+    };
+  }>;
+  paging?: { next?: string };
 };
 
 export const malProvider: Provider = {
@@ -61,6 +73,37 @@ export const malProvider: Provider = {
         siteUrl: `https://myanimelist.net/anime/${node.id}`
       } satisfies AnimeCandidate;
     });
+  },
+  async getAnimeListEntries(providerAnimeIds: number[], token: string): Promise<ExistingListEntry[]> {
+    const wanted = new Set(providerAnimeIds);
+    if (wanted.size === 0) return [];
+
+    const found = new Map<number, ExistingListEntry>();
+    let nextUrl: string | undefined = "https://api.myanimelist.net/v2/users/@me/animelist";
+
+    while (nextUrl && found.size < wanted.size) {
+      const url: URL = new URL(nextUrl);
+      if (!url.searchParams.has("fields")) url.searchParams.set("fields", "list_status");
+      if (!url.searchParams.has("limit")) url.searchParams.set("limit", "1000");
+
+      const json: MalAnimeListResponse = await readJson<MalAnimeListResponse>(
+        await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      );
+
+      for (const item of json.data) {
+        if (!wanted.has(item.node.id)) continue;
+        found.set(item.node.id, {
+          providerAnimeId: item.node.id,
+          status: fromMalStatus(item.list_status?.status),
+          score: item.list_status?.score,
+          progress: item.list_status?.num_episodes_watched
+        });
+      }
+
+      nextUrl = json.paging?.next;
+    }
+
+    return Array.from(found.values());
   },
   async saveAnimeEntry(selection: SaveSelection, token: string): Promise<unknown> {
     const url = `https://api.myanimelist.net/v2/anime/${selection.providerAnimeId}/my_list_status`;
